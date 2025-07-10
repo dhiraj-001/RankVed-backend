@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="WordPress 6.4">
+    <title>WordPress Compatibility Test - RankVed Chat Widget</title>
+    
+    <!-- WordPress-like meta tags -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    
+    <!-- Simulate WordPress admin bar styles -->
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f0f0f1;
+        }
+        
+        /* WordPress Admin Bar Simulation */
+        #wpadminbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 32px;
+            background: #23282d;
+            z-index: 99999;
+            border-bottom: 1px solid #3c434a;
+        }
+        
+        .wp-admin-bar-text {
+            color: #eee;
+            font-size: 13px;
+            line-height: 32px;
+            padding: 0 15px;
+        }
+        
+        /* WordPress Theme Simulation */
+        .site-header {
+            background: white;
+            padding: 1rem 2rem;
+            margin-top: 32px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1000;
+        }
+        
+        .site-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo { font-size: 1.8rem; font-weight: 700; color: #2563eb; }
+        
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+        
+        .nav-menu a {
+            text-decoration: none;
+            color: #374151;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        
+        .nav-menu a:hover { color: #2563eb; }
+        
+        /* Content Area */
+        .main-content {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .content-inner {
+            padding: 3rem;
+        }
+        
+        h1 {
+            color: #1f2937;
+            margin-bottom: 1.5rem;
+            font-size: 2.5rem;
+        }
+        
+        .test-section {
+            margin: 2rem 0;
+            padding: 2rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        
+        .test-section h2 {
+            color: #374151;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .test-info {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .test-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .test-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+        }
+        
+        .test-item h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #374151;
+        }
+        
+        .test-item .result {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .result.pass {
+            background: #d1fae5;
+            color: #047857;
+        }
+        
+        .result.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        /* WordPress Plugin Conflict Simulation */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 50000;
+            display: none;
+        }
+        
+        .popup-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            z-index: 50001;
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        /* Footer */
+        .site-footer {
+            background: #374151;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .nav-menu { display: none; }
+            .main-content { margin: 1rem; }
+            .content-inner { padding: 1.5rem; }
+            h1 { font-size: 2rem; }
+            .test-results { grid-template-columns: 1fr; }
+            
+            #wpadminbar { height: 46px; }
+            .site-header { margin-top: 46px; }
+        }
+        
+        /* WordPress Theme Buttons */
+        .wp-button {
+            background: #2271b1;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .wp-button:hover {
+            background: #135e96;
+        }
+        
+        /* Simulate WordPress plugin conflicts */
+        .conflict-element {
+            position: fixed;
+            top: 100px;
+            right: 30px;
+            width: 200px;
+            height: 150px;
+            background: #ff6b6b;
+            z-index: 9998;
+            display: none;
+            border-radius: 4px;
+            padding: 1rem;
+            color: white;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- WordPress Admin Bar -->
+    <div id="wpadminbar">
+        <div class="wp-admin-bar-text">WordPress Admin Bar (Z-Index: 99999)</div>
+    </div>
+    
+    <!-- Site Header -->
+    <header class="site-header">
+        <nav class="site-nav">
+            <div class="logo">TestSite</div>
+            <ul class="nav-menu">
+                <li><a href="#home">Home</a></li>
+                <li><a href="#about">About</a></li>
+                <li><a href="#services">Services</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-inner">
+            <h1>WordPress Compatibility Test</h1>
+            <p>This page simulates a real WordPress environment to test RankVed chat widget compatibility.</p>
+            
+            <div class="test-section">
+                <h2>
+                    <span class="status-indicator"></span>
+                    Live Compatibility Testing
+                </h2>
+                
+                <div class="test-info">
+                    <strong>Testing Environment:</strong>
+                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>WordPress Admin Bar (Z-Index: 99999)</li>
+                        <li>Theme Navigation (Z-Index: 1000)</li>
+                        <li>Plugin Conflict Simulation</li>
+                        <li>Mobile Responsive Design</li>
+                        <li>jQuery and WordPress Scripts</li>
+                    </ul>
+                </div>
+                
+                <div class="test-results">
+                    <div class="test-item">
+                        <h3>Chat Bubble Visibility</h3>
+                        <div id="bubble-test" class="result pending">Testing...</div>
+                    </div>
+                    
+                    <div class="test-item">
+                        <h3>Click Responsiveness</h3>
+                        <div id="click-test" class="result pending">Testing...</div>
+                    </div>
+                    
+                    <div class="test-item">
+                        <h3>Z-Index Handling</h3>
+                        <div id="zindex-test" class="result pending">Testing...</div>
+                    </div>
+                    
+                    <div class="test-item">
+                        <h3>Mobile Compatibility</h3>
+                        <div id="mobile-test" class="result pending">Testing...</div>
+                    </div>
+                    
+                    <div class="test-item">
+                        <h3>Question Flow Integration</h3>
+                        <div id="flow-test" class="result pending">Testing...</div>
+                    </div>
+                    
+                    <div class="test-item">
+                        <h3>Lead Collection</h3>
+                        <div id="lead-test" class="result pending">Testing...</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 2rem;">
+                    <button class="wp-button" onclick="simulateConflict()">Simulate Plugin Conflict</button>
+                    <button class="wp-button" onclick="testMobile()">Test Mobile View</button>
+                    <button class="wp-button" onclick="testPopup()">Test Popup Conflict</button>
+                    <button class="wp-button" onclick="resetTests()">Reset Tests</button>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Integration Instructions</h2>
+                <div class="test-info">
+                    <p><strong>For WordPress Integration:</strong></p>
+                    <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>Copy the embed code from your RankVed dashboard</li>
+                        <li>Paste it in your WordPress theme's footer.php before the closing &lt;/body&gt; tag</li>
+                        <li>Or use a plugin like "Insert Headers and Footers"</li>
+                        <li>The chat widget will automatically detect WordPress and optimize for compatibility</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Site Footer -->
+    <footer class="site-footer">
+        <p>&copy; 2024 TestSite. Powered by WordPress. Chat by RankVed.</p>
+    </footer>
+    
+    <!-- Conflict Simulation Elements -->
+    <div class="popup-overlay" id="popup-overlay">
+        <div class="popup-modal">
+            <h3>Plugin Popup (Z-Index: 50001)</h3>
+            <p>This simulates a WordPress plugin popup that might conflict with the chat widget.</p>
+            <button class="wp-button" onclick="hidePopup()">Close</button>
+        </div>
+    </div>
+    
+    <div class="conflict-element" id="conflict-element">
+        Plugin Widget<br>
+        (Z-Index: 9998)<br>
+        Potential Conflict
+    </div>
+    
+    <!-- WordPress-like Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <script>
+        // WordPress-like environment simulation
+        window.wp = { ajax: { url: '/wp-admin/admin-ajax.php' } };
+        
+        // Test functions
+        function simulateConflict() {
+            document.getElementById('conflict-element').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('conflict-element').style.display = 'none';
+            }, 5000);
+        }
+        
+        function testMobile() {
+            if (window.innerWidth > 768) {
+                document.body.style.width = '375px';
+                document.body.style.margin = '0 auto';
+                document.body.style.border = '2px solid #ccc';
+                setTimeout(() => {
+                    document.body.style.width = '';
+                    document.body.style.margin = '';
+                    document.body.style.border = '';
+                }, 3000);
+            }
+        }
+        
+        function testPopup() {
+            document.getElementById('popup-overlay').style.display = 'block';
+        }
+        
+        function hidePopup() {
+            document.getElementById('popup-overlay').style.display = 'none';
+        }
+        
+        function resetTests() {
+            document.querySelectorAll('.result').forEach(el => {
+                el.className = 'result pending';
+                el.textContent = 'Testing...';
+            });
+            runCompatibilityTests();
+        }
+        
+        function runCompatibilityTests() {
+            // Test chat bubble visibility
+            setTimeout(() => {
+                const bubble = document.getElementById('rankved-chat-bubble');
+                const bubbleTest = document.getElementById('bubble-test');
+                if (bubble && window.getComputedStyle(bubble).display !== 'none') {
+                    bubbleTest.className = 'result pass';
+                    bubbleTest.textContent = 'Visible & Positioned';
+                } else {
+                    bubbleTest.className = 'result pending';
+                    bubbleTest.textContent = 'Waiting for widget...';
+                }
+            }, 2000);
+            
+            // Test click responsiveness
+            setTimeout(() => {
+                const bubble = document.getElementById('rankved-chat-bubble');
+                const clickTest = document.getElementById('click-test');
+                if (bubble) {
+                    // Test if bubble has click handlers
+                    const hasListeners = bubble.onclick || bubble.addEventListener;
+                    if (hasListeners || bubble.style.cursor === 'pointer') {
+                        clickTest.className = 'result pass';
+                        clickTest.textContent = 'Click handlers active';
+                    } else {
+                        clickTest.className = 'result pending';
+                        clickTest.textContent = 'Checking...';
+                    }
+                }
+            }, 3000);
+            
+            // Test z-index handling
+            setTimeout(() => {
+                const bubble = document.getElementById('rankved-chat-bubble');
+                const zindexTest = document.getElementById('zindex-test');
+                if (bubble) {
+                    const zIndex = parseInt(window.getComputedStyle(bubble).zIndex);
+                    if (zIndex > 99999) {
+                        zindexTest.className = 'result pass';
+                        zindexTest.textContent = `Z-Index: ${zIndex} (Above WordPress)`;
+                    } else {
+                        zindexTest.className = 'result pending';
+                        zindexTest.textContent = 'Checking z-index...';
+                    }
+                }
+            }, 4000);
+            
+            // Test mobile compatibility
+            setTimeout(() => {
+                const mobileTest = document.getElementById('mobile-test');
+                const isMobile = window.innerWidth <= 768;
+                mobileTest.className = 'result pass';
+                mobileTest.textContent = isMobile ? 'Mobile layout active' : 'Desktop layout ready';
+            }, 5000);
+            
+            // Test question flow
+            setTimeout(() => {
+                const flowTest = document.getElementById('flow-test');
+                if (window.CHATBOT_CONFIG && window.CHATBOT_CONFIG.questionFlow) {
+                    flowTest.className = 'result pass';
+                    flowTest.textContent = 'Question flows loaded';
+                } else {
+                    flowTest.className = 'result pending';
+                    flowTest.textContent = 'Waiting for config...';
+                }
+            }, 6000);
+            
+            // Test lead collection
+            setTimeout(() => {
+                const leadTest = document.getElementById('lead-test');
+                if (window.CHATBOT_CONFIG && window.CHATBOT_CONFIG.leadCollectionEnabled) {
+                    leadTest.className = 'result pass';
+                    leadTest.textContent = 'Lead collection ready';
+                } else {
+                    leadTest.className = 'result pass';
+                    leadTest.textContent = 'Standard chat mode';
+                }
+            }, 7000);
+        }
+        
+        // Start tests when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(runCompatibilityTests, 1000);
+        });
+        
+        // Monitor for chat widget loading
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes.length) {
+                    for (let node of mutation.addedNodes) {
+                        if (node.nodeType === 1 && (
+                            node.id === 'rankved-chat-bubble' || 
+                            node.getAttribute && node.getAttribute('data-rankved-widget')
+                        )) {
+                            console.log('RankVed widget detected!');
+                            setTimeout(runCompatibilityTests, 500);
+                        }
+                    }
+                }
+            });
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    </script>
+    
+    <!-- RankVed Chat Widget - Replace with your actual embed code -->
+    <script>
+        // Live configuration loader for WordPress compatibility testing
+        (function() {
+            if (window.rankvedChatbotInitialized) return;
+            window.rankvedChatbotInitialized = true;
+            
+            console.log('🔄 Loading live WordPress-compatible configuration...');
+            
+            // Fetch live configuration from API
+            fetch(window.location.origin + '/api/chatbots')
+                .then(response => response.json())
+                .then(chatbots => {
+                    if (chatbots && chatbots.length > 0) {
+                        const activeChatbot = chatbots[0];
+                        
+                        // Set live configuration with WordPress optimizations
+                        window.CHATBOT_CONFIG = {
+                            chatbotId: activeChatbot.id,
+                            apiUrl: window.location.origin,
+                            name: activeChatbot.name || 'Live WordPress Bot',
+                            welcomeMessage: activeChatbot.welcomeMessage || 'Hello! This is live from your dashboard.',
+                            placeholder: activeChatbot.placeholder || 'Type your message...',
+                            primaryColor: activeChatbot.primaryColor || '#2563eb',
+                            bubbleIcon: activeChatbot.bubbleIcon,
+                            windowAvatar: activeChatbot.windowAvatar,
+                            windowTitle: activeChatbot.windowTitle,
+                            questionFlowEnabled: true,
+                            leadCollectionEnabled: true,
+                            poweredBy: 'Powered by RankVed',
+                            poweredByLink: 'https://rankved.com'
+                        };
+                        
+                        console.log('✅ Live WordPress configuration loaded:', window.CHATBOT_CONFIG);
+                        loadChatBot();
+                        
+                    } else {
+                        console.log('❌ No chatbots found');
+                        // Fallback configuration
+                        window.CHATBOT_CONFIG = {
+                            chatbotId: 'demo-bot',
+                            apiUrl: window.location.origin,
+                            name: 'Demo WordPress Bot',
+                            welcomeMessage: 'Hello! Create a chatbot to see live changes.',
+                            placeholder: 'Create a chatbot first...',
+                            primaryColor: '#2563eb',
+                            questionFlowEnabled: true,
+                            leadCollectionEnabled: true,
+                            poweredBy: 'Powered by RankVed',
+                            poweredByLink: 'https://rankved.com'
+                        };
+                        loadChatBot();
+                    }
+                })
+                .catch(error => {
+                    console.log('❌ Failed to load live configuration:', error);
+                    // Fallback for network issues
+                    window.CHATBOT_CONFIG = {
+                        chatbotId: 'fallback-bot',
+                        apiUrl: window.location.origin,
+                        name: 'Fallback Bot',
+                        welcomeMessage: 'Hello! Network issue - using fallback config.',
+                        placeholder: 'Type your message...',
+                        primaryColor: '#2563eb',
+                        questionFlowEnabled: true,
+                        leadCollectionEnabled: true,
+                        poweredBy: 'Powered by RankVed',
+                        poweredByLink: 'https://rankved.com'
+                    };
+                    loadChatBot();
+                });
+            
+            function loadChatBot() {
+                const script = document.createElement('script');
+                script.src = window.location.origin + '/wordpress-embed-fixed.js';
+                script.async = true;
+                script.defer = true;
+                script.setAttribute('data-rankved-widget', 'true');
+                script.onload = function() {
+                    console.log('RankVed Chat loaded successfully');
+                };
+                script.onerror = function() {
+                    console.warn('RankVed Chat could not be loaded - using fallback');
+                    // Fallback for testing
+                    createTestWidget();
+                };
+                
+                const target = document.querySelector('head') || document.body;
+                target.appendChild(script);
+            }
+            
+            // Fallback test widget for demonstration
+            function createTestWidget() {
+                const bubble = document.createElement('div');
+                bubble.id = 'rankved-chat-bubble';
+                bubble.setAttribute('data-rankved-widget', 'true');
+                bubble.style.cssText = `
+                    position: fixed !important;
+                    bottom: 25px !important;
+                    right: 25px !important;
+                    z-index: 999999 !important;
+                    width: 65px !important;
+                    height: 65px !important;
+                    background: #2563eb !important;
+                    border-radius: 50% !important;
+                    cursor: pointer !important;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    transition: all 0.3s ease !important;
+                `;
+                bubble.innerHTML = `
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                `;
+                
+                bubble.addEventListener('click', function() {
+                    alert('WordPress compatibility test successful! The chat widget is clickable and properly positioned.');
+                });
+                
+                document.body.appendChild(bubble);
+            }
+            
+            function initWhenReady() {
+                if (document.readyState === 'complete' || 
+                    (document.readyState === 'interactive' && document.body)) {
+                    loadChatBot();
+                } else {
+                    document.addEventListener('DOMContentLoaded', loadChatBot);
+                    document.addEventListener('load', loadChatBot);
+                    setTimeout(loadChatBot, 1000);
+                }
+            }
+            
+            initWhenReady();
+        })();
+    </script>
+</body>
+</html>

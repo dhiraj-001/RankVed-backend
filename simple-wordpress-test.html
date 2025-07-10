@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple WordPress Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+        }
+        .content {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .test-info {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .loading { background: #fff3cd; color: #856404; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <h1>WordPress Chatbot Test</h1>
+        <div class="test-info">
+            <p><strong>Testing the RankVed chatbot on WordPress-like environment</strong></p>
+            <p>This page simulates a WordPress site to test chatbot functionality.</p>
+        </div>
+        
+        <div id="status" class="status loading">Loading chatbot...</div>
+        
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        
+        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+    </div>
+
+    <!-- RankVed Chatbot Embed Code -->
+    <script>
+        // Live configuration loader that syncs with dashboard changes
+        (function() {
+            console.log('🔄 Loading live chatbot configuration...');
+            
+            // Prevent multiple loads
+            if (window.rankvedLoaded) return;
+            window.rankvedLoaded = true;
+            
+            // Fetch live configuration from API
+            fetch(window.location.origin + '/api/chatbots')
+                .then(response => response.json())
+                .then(chatbots => {
+                    if (chatbots && chatbots.length > 0) {
+                        const activeChatbot = chatbots[0]; // Use first chatbot
+                        
+                        // Set live configuration
+                        window.CHATBOT_CONFIG = {
+                            chatbotId: activeChatbot.id,
+                            apiUrl: window.location.origin,
+                            name: activeChatbot.name || 'Live Chatbot',
+                            primaryColor: activeChatbot.primaryColor || '#3B82F6',
+                            welcomeMessage: activeChatbot.welcomeMessage || 'Hello! How can I help you today?',
+                            placeholder: activeChatbot.placeholder || 'Type your message...',
+                            bubbleIcon: activeChatbot.bubbleIcon,
+                            windowAvatar: activeChatbot.windowAvatar,
+                            windowTitle: activeChatbot.windowTitle
+                        };
+                        
+                        console.log('✅ Live configuration loaded:', window.CHATBOT_CONFIG);
+                        
+                        // Load the WordPress script with live config
+                        const script = document.createElement('script');
+                        script.src = window.location.origin + '/wordpress-embed.js';
+                        script.async = true;
+                        
+                        script.onload = function() {
+                            console.log('✅ Chatbot script loaded successfully');
+                            document.getElementById('status').className = 'status success';
+                            document.getElementById('status').textContent = 'Live chatbot loaded successfully!';
+                            
+                            // Check for chat bubble after a delay
+                            setTimeout(function() {
+                                const bubble = document.getElementById('rankved-chat-bubble');
+                                if (bubble) {
+                                    console.log('✅ Chat bubble found and visible');
+                                    document.getElementById('status').textContent = 'Live chatbot ready with your latest settings!';
+                                } else {
+                                    console.log('❌ Chat bubble not found');
+                                    document.getElementById('status').className = 'status error';
+                                    document.getElementById('status').textContent = 'Chat bubble not found - checking script...';
+                                }
+                            }, 2000);
+                        };
+                        
+                        script.onerror = function() {
+                            console.log('❌ Failed to load chatbot script');
+                            document.getElementById('status').className = 'status error';
+                            document.getElementById('status').textContent = 'Failed to load chatbot script';
+                        };
+                        
+                        // Add to head or body
+                        (document.head || document.body).appendChild(script);
+                        
+                    } else {
+                        console.log('❌ No chatbots found');
+                        document.getElementById('status').className = 'status error';
+                        document.getElementById('status').textContent = 'No chatbots found - please create one first';
+                    }
+                })
+                .catch(error => {
+                    console.log('❌ Failed to load configuration:', error);
+                    document.getElementById('status').className = 'status error';
+                    document.getElementById('status').textContent = 'Failed to load live configuration';
+                });
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Widget Improvements Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .demo-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 800px;
+            width: 90%;
+        }
+        .improvements-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .improvement-item {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border-left: 4px solid #10b981;
+        }
+        .improvement-item h3 {
+            margin: 0 0 8px 0;
+            color: #065f46;
+            font-size: 16px;
+        }
+        .improvement-item p {
+            margin: 0;
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .demo-widget {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .widget-frame {
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            height: 500px;
+            background: #f9fafb;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1 style="text-align: center; margin-bottom: 30px; color: #1f2937;">Chat Widget Improvements Complete</h1>
+        
+        <div class="improvements-list">
+            <div class="improvement-item">
+                <h3>Modern Send Button</h3>
+                <p>Replaced text with sleek arrow icon. Added hover effects and perfect sizing for modern UI.</p>
+            </div>
+            
+            <div class="improvement-item">
+                <h3>Clickable Powered By</h3>
+                <p>Dark blue (#1d4ed8) color with hover underline. Links to your specified URL.</p>
+            </div>
+            
+            <div class="improvement-item">
+                <h3>Auto-Select Latest</h3>
+                <p>Dashboard automatically selects and displays your most recently updated chatbot.</p>
+            </div>
+            
+            <div class="improvement-item">
+                <h3>Agency Branding</h3>
+                <p>Name and logo from Visual Branding section now appear in dashboard header.</p>
+            </div>
+            
+            <div class="improvement-item">
+                <h3>Responsive Design</h3>
+                <p>Chat widget and dashboard adapt perfectly to mobile and desktop screens.</p>
+            </div>
+            
+            <div class="improvement-item">
+                <h3>Question Flows</h3>
+                <p>Interactive question flows with clickable buttons guide user conversations.</p>
+            </div>
+        </div>
+
+        <div class="demo-widget">
+            <h2 style="color: #374151; margin-bottom: 15px;">Live Chat Widget</h2>
+            <div class="widget-frame">
+                <iframe 
+                    src="/chat-widget/1272a388-d86e-4239-9d67-fe0257148f00" 
+                    width="100%" 
+                    height="100%" 
+                    frameborder="0"
+                    style="border-radius: 10px;">
+                </iframe>
+            </div>
+            <p style="margin-top: 15px; color: #6b7280; font-size: 14px;">
+                Notice the modern arrow send button, dark blue powered by link, and responsive design
+            </p>
+        </div>
+    </div>
+</body>
+</html>

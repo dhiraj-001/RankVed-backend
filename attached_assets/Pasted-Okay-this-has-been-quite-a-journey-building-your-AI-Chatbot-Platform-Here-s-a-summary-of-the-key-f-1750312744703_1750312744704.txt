@@ -1,0 +1,130 @@
+Okay, this has been quite a journey building your AI Chatbot Platform! Here's a summary of the key features and architectural decisions we've implemented together:
+
+I. Core Application Purpose:
+
+A platform for creating, configuring, managing, and embedding AI-powered chatbots onto websites.
+Provides an admin interface for chatbot management and a chat interface for end-users.
+II. Admin Panel Features:
+
+Dashboard (/admin/dashboard):
+
+Create new chatbots (specifying a name).
+List all existing chatbots with their creation date and ID.
+Select an active chatbot to configure.
+Delete chatbots with a confirmation dialog.
+Highlights the currently active chatbot.
+Chatbot Settings (/admin/settings):
+
+Basic Configuration: Bot Name, AI System Prompt (custom instructions for Genkit).
+Branding: Upload Chat Window Avatar, Chat Bubble Icon (as Data URIs).
+Messaging: Welcome Message, Initial Message Delay (ms).
+Notifications: Enable/disable Chat Bubble Notification Sound, upload custom sound (Data URI).
+Integrations: Leads Webhook URL.
+Flow & Branding: Select Business Type (influences default question flow), "Powered By" text and link.
+Placement: Chat Bubble Position (bottom-right, bottom-left, etc.), Horizontal & Vertical Offsets (px).
+AI Provider: Select between Platform Default (Gemini), Custom Google AI Key, or Custom OpenAI Key, with fields to input custom keys.
+Usage Limits: Set Daily and Monthly chat limits, with display of current counts (counts reset daily/monthly).
+Chatbot Appearance (/admin/appearance - for a selected chatbot):
+
+Customize the chatbot's title, welcome message, primary color (hex with color picker), and toggle for welcome message popup.
+Configure initial suggestion buttons (one per line).
+Set placeholder text for the chat input.
+Define text for the lead collection button.
+Global Appearance & Theme (/admin/appearance - when no chatbot is active):
+
+Agency Branding: Set Agency Name and upload Agency Logo (Data URI) for the admin sidebar.
+Global Theme Override: Modify base HSL CSS variables (--background, --foreground, --primary, --accent) in globals.css for the application's light theme.
+Question Flow Builder (/admin/questions):
+
+Visually manage the conversation logic for the selected chatbot.
+Create, edit, and delete individual question nodes (identified by unique IDs).
+Supports question types:
+statement: Bot says something, can lead to another question or end chat.
+multiple-choice: User picks an option, each option can lead to another question or perform an action (collect lead, end chat).
+contact-form: Displays a form to collect name, phone, and consent.
+open-ended: User types free text, can lead to another question or trigger AI response handling.
+Link questions together to create conversational flows.
+Store answers to questions in context variables.
+Option to reset the flow to a default template.
+Training Data Management (/admin/training):
+
+Provide custom textual training data for the selected chatbot to enhance AI responses.
+Fetch content from specified URLs (one per line) to append to the training data using a Genkit flow (fetchWebsiteContentFlow).
+Process and save training data (involves a Genkit flow processTrainingData).
+Leads Management (/admin/leads):
+
+View a table of leads collected through the chatbots.
+Filter leads by chatbot ("All Chatbots" or a specific one).
+Displays lead name, phone, consent status, timestamp, chatbot source (if "All" is selected), and collected context/answers.
+Embed Chatbot (/admin/embed):
+
+Generate an HTML iframe embed code for the selected chatbot.
+The embed code includes the chatbot ID and styles for fixed positioning.
+Provides warnings about testing embed code on localhost versus a deployed site.
+III. Chat Interface Features (for End-Users - via /chat-embed or homepage):
+
+Chat Bubble:
+
+Fixed-position launcher icon on the website.
+Customizable icon and primary color (from admin settings).
+Plays a notification sound on appearance (customizable or default).
+Toggles the chat window open/closed.
+ChatWindow:
+
+Displays conversation messages between the user and the bot.
+Customizable header (bot name, avatar, primary color).
+Input area for users to type messages.
+Displays quick reply buttons for multiple-choice questions.
+Shows a "Powered By" link if configured.
+Conversation Logic:
+
+Initiates with a welcome message (with configurable delay).
+Follows the defined question flow from the admin panel.
+Collects user selections and stores them in context.
+Can display a contact capture form.
+Typing indicator (<TypingIndicator />) to show when the bot is processing.
+AI Integration (Genkit):
+
+Uses generateResponse flow for answering open-ended user queries based on training data and system prompts.
+aiSystemPrompt from chatbot settings guides the AI's personality and rules.
+IV. Technical Architecture & Key Decisions:
+
+Tech Stack:
+
+Next.js 15+ (App Router)
+React 18+ (Functional Components, Hooks)
+ShadCN UI components
+Tailwind CSS
+Genkit (for all AI functionalities)
+TypeScript
+State Management:
+
+AppProvider (src/contexts/app-provider.tsx) using React Context for global state (chatbot settings, leads, UI states like isChatOpen, messages, theme).
+Data Persistence:
+
+Initial approach: Used browser localStorage to store all chatbot settings (allChatbotSettings), agency settings, active chatbot ID, leads, and theme.
+Current (Evolved) approach:
+Removed all localStorage dependencies for data persistence from AppProvider.
+AppProvider now attempts to fetch initial data from placeholder API routes:
+/api/agency-settings
+/api/chatbots
+/api/leads
+Placeholder API route files (src/app/api/.../route.ts) have been created.
+The user (you) is now responsible for implementing the backend logic within these API routes to connect to a database (e.g., Cloud Firestore) for permanent data storage.
+Until the backend is implemented, the application operates on in-memory data, which is lost on page refresh.
+Styling:
+
+Utilizes ShadCN UI components.
+Tailwind CSS for utility classes and custom styling.
+globals.css defines CSS variables for theming (light/dark modes, primary, accent colors), with admin controls to modify the light theme's core HSL values.
+Genkit Flows (src/ai/flows):
+
+generate-response.ts: Handles generating AI responses using user query, training data, and system prompt.
+process-training-data.ts: Simulates processing/validating training data.
+fetch-website-content-flow.ts: Fetches and extracts text content from URLs for training data.
+Genkit is initialized in src/ai/genkit.ts using the GOOGLE_API_KEY from environment variables.
+Deployment:
+
+Targeted for Firebase App Hosting (configured via apphosting.yaml).
+README.md updated with deployment instructions, including setting GOOGLE_API_KEY as a backend environment variable.
+This summary captures the main journey of building your application, from initial features to the significant architectural shift towards a backend-driven data model. The next big step for you is to build out those API routes and connect them to your chosen database!

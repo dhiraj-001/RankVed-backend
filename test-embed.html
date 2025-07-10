@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chatbot Embed</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <h1>Test Page for Chatbot Embed</h1>
+        <p>This is a test page to verify the chatbot embed functionality works correctly.</p>
+        <p>The chatbot widget should appear in the bottom-right corner of the page.</p>
+        <p>You can scroll down to see more content and test the widget positioning.</p>
+        
+        <div style="height: 400px; background: linear-gradient(to bottom, #f0f0f0, #e0e0e0); padding: 20px; margin: 20px 0; border-radius: 8px;">
+            <h2>Sample Content Area</h2>
+            <p>This is a large content area to test how the chatbot widget behaves with page scrolling.</p>
+            <p>Try clicking the blue chat bubble in the bottom-right corner to open the chat window!</p>
+            <p>The chat window should:</p>
+            <ul>
+                <li>Appear as a popup overlay</li>
+                <li>Stay in a fixed position while scrolling</li>
+                <li>Display a welcome message</li>
+                <li>Allow you to type and send messages</li>
+                <li>Respond with AI-generated replies</li>
+            </ul>
+        </div>
+        
+        <div style="height: 600px; background: linear-gradient(to bottom, #e8f4fd, #d1ecf1); padding: 20px; margin: 20px 0; border-radius: 8px;">
+            <h2>More Content to Test Scrolling</h2>
+            <p>Scroll down to see how the chatbot widget maintains its position.</p>
+            <p>The chat bubble should always stay visible in the bottom-right corner.</p>
+            <p>When the chat window is open, it should remain positioned correctly even when scrolling.</p>
+            
+            <h3>Test Instructions:</h3>
+            <ol>
+                <li>Click the chat bubble to open the chat window</li>
+                <li>Try scrolling the page - the chat should stay in place</li>
+                <li>Type a message like "Hello" and press Enter</li>
+                <li>Wait for the AI response</li>
+                <li>Click the X button to close the chat</li>
+                <li>Click outside the chat window to close it</li>
+                <li>Press Escape key to close the chat</li>
+            </ol>
+        </div>
+        
+        <div style="height: 400px; background: linear-gradient(to bottom, #fff3cd, #ffeaa7); padding: 20px; margin: 20px 0; border-radius: 8px;">
+            <h2>Bottom Section</h2>
+            <p>This section tests how the chat widget behaves when there's content at the bottom of the page.</p>
+            <p>The chat bubble should not overlap with important content and should remain accessible.</p>
+        </div>
+    </div>
+
+    <!-- ChatBot Pro Embed Code -->
+    <script>
+      (function() {
+        // Prevent multiple loads
+        if (window.chatBotProInitialized) return;
+        window.chatBotProInitialized = true;
+        
+        const chatbotConfig = {
+          chatbotId: '1272a388-d86e-4239-9d67-fe0257148f00',
+          primaryColor: '#38e8ff',
+          position: 'bottom-right'
+        };
+        
+        function loadChatBot() {
+          const script = document.createElement('script');
+          script.src = window.location.origin + '/chat-widget-embed.js';
+          script.onload = function() {
+            if (window.ChatBotWidget && window.ChatBotWidget.init) {
+              window.ChatBotWidget.init(chatbotConfig);
+            }
+          };
+          script.onerror = function() {
+            console.error('Failed to load ChatBot Widget');
+          };
+          document.head.appendChild(script);
+        }
+        
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', loadChatBot);
+        } else {
+          loadChatBot();
+        }
+      })();
+    </script>
+    <!-- End ChatBot Pro Embed Code -->
+</body>
+</html>
