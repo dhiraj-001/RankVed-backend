@@ -23,7 +23,8 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     'http://localhost:5173', // Vite dev server
     'http://localhost:3000', // Alternative dev server
-    'https://your-frontend-domain.vercel.app', // Production frontend
+    'https://your-frontend-domain.vercel.app',
+    'https://rank-ved-frontend-rfam.vercel.app'// Production frontend
     // Add your actual frontend domain here
   ];
   
