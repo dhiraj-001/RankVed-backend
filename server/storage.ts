@@ -108,9 +108,33 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getChatbot(id: string): Promise<Chatbot | undefined> {
+  async getChatbot(chatbotId: string): Promise<any> {
+    // DEMO fallback: if demo-chatbot, return a hardcoded demo bot
+    if (chatbotId === 'demo-chatbot') {
+      return {
+        id: 'demo-chatbot',
+        name: 'Demo Chatbot',
+        isActive: true,
+        primaryColor: '#6366F1',
+        welcomeMessage: 'Hello! I am a demo chatbot. How can I help you?',
+        inputPlaceholder: 'Type your message...',
+        chatBubbleIcon: '',
+        chatWindowAvatar: '',
+        poweredByText: 'Powered by RankVed',
+        poweredByLink: 'https://rankved.com',
+        aiProvider: 'openai',
+        customApiKey: '',
+        leadCollectionEnabled: false,
+        leadCollectionAfterMessages: 3,
+        leadCollectionMessage: '',
+        userId: 1,
+        allowedDomains: [],
+        trainingData: '',
+        aiSystemPrompt: '',
+      };
+    }
     const db = await getDb();
-    const [chatbot] = await db.select().from(chatbots).where(eq(chatbots.id, id));
+    const [chatbot] = await db.select().from(chatbots).where(eq(chatbots.id, chatbotId));
     return chatbot || undefined;
   }
 

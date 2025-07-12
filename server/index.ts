@@ -23,13 +23,15 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     'http://localhost:5173', // Vite dev server
     'http://localhost:3000', // Alternative dev server
+     // Your current frontend origin
     'https://your-frontend-domain.vercel.app',
-    'https://rank-ved-frontend-rfam.vercel.app'// Production frontend
+    'https://rank-ved-frontend-rfam.vercel.app',
+    // Production frontend
     // Add your actual frontend domain here
   ];
   
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   
