@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 console.log('openai',process.env.OPENAI_API_KEY)
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
@@ -39,7 +40,7 @@ ${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`
     });
 
     return response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
-  } catch (error) {
+  } catch (error: any) {
     console.error("OpenAI API error:", error);
     throw new Error("Failed to generate AI response");
   }
@@ -73,13 +74,33 @@ export async function processTrainingData(content: string): Promise<{
       summary: result.summary || "Content processed successfully",
       wordCount: content.split(/\s+/).length,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Training data processing error:", error);
     return {
       processed: false,
       summary: "Failed to process training data",
       wordCount: 0,
     };
+  }
+}
+
+export async function generateGeminiResponse(
+  message: string,
+  apiKey?: string,
+  model: string = "gemini-2.5-flash"
+): Promise<string> {
+  try {
+    const key = apiKey || process.env.GEMINI_API_KEY;
+    if (!key) throw new Error("No Gemini API key provided");
+    const ai = new GoogleGenAI({ apiKey: String(key) });
+    const response = await ai.models.generateContent({
+      model,
+      contents: message,
+    });
+    return response.text;
+  } catch (error: any) {
+    console.error("Gemini API error:", error);
+    throw new Error("Failed to generate Gemini response");
   }
 }
 
@@ -174,7 +195,7 @@ export async function fetchWebsiteContent(url: string): Promise<string> {
           const pageHtml = await pageResponse.text();
           return cleanHtmlContent(pageHtml);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.log(`Failed to fetch ${link}:`, error.message);
       }
       return '';
@@ -188,7 +209,7 @@ export async function fetchWebsiteContent(url: string): Promise<string> {
     console.log(`Successfully processed website with ${allContent.length} pages, total length: ${combinedContent.length} characters`);
     
     return combinedContent;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Website content fetch error:", error);
     throw new Error(`Failed to fetch content from ${url}: ${error.message}`);
   }

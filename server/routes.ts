@@ -370,18 +370,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         response = chatbot.leadCollectionMessage || "To help you better, may I have your name and contact information?";
         responseType = 'form';
       } else {
-        if (chatbot.aiProvider === "openai" && chatbot.customApiKey) {
-          response = await generateChatResponse(
+        if (chatbot.aiProvider === "google") {
+          // Use Gemini
+          response = await require('./ai/openai').generateGeminiResponse(
+            message,
+            chatbot.customApiKey,
+            chatbot.model || "gemini-1.5-pro"
+          );
+        } else {
+          // Default to OpenAI
+          response = await require('./ai/openai').generateChatResponse(
             message,
             chatbot.aiSystemPrompt || "You are a helpful assistant.",
             chatbot.trainingData || undefined,
-            chatbot.customApiKey
-          );
-        } else {
-          response = await generateChatResponse(
-            message,
-            chatbot.aiSystemPrompt || "You are a helpful assistant.",
-            chatbot.trainingData || undefined
+            chatbot.customApiKey,
+            chatbot.model // (if you add model support to OpenAI)
           );
         }
       }
