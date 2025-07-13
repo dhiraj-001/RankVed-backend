@@ -191,7 +191,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!chatbot) {
         return res.status(404).json({ message: "Chatbot not found" });
       }
-      
+      // Domain security validation
+      const origin = req.headers.origin || req.headers.referer;
+      if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
+        const isAllowed = chatbot.allowedDomains.some(domain => {
+          if (origin) {
+            return origin.includes(domain);
+          }
+          return false;
+        });
+        if (!isAllowed) {
+          return res.status(403).json({ message: "Domain not authorized to use this chatbot" });
+        }
+      }
       // Return only public configuration data
       res.json({
         id: chatbot.id,
@@ -454,13 +466,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { chatbotId } = req.params;
       const { name, email, phone, source = 'chat_widget' } = req.body;
-      
       // Get chatbot to find the owner
       const chatbot = await storage.getChatbot(chatbotId);
       if (!chatbot || !chatbot.isActive) {
         return res.status(404).json({ message: "Chatbot not found or inactive" });
       }
-      
+      // Domain security validation
+      const origin = req.headers.origin || req.headers.referer;
+      if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
+        const isAllowed = chatbot.allowedDomains.some(domain => {
+          if (origin) {
+            return origin.includes(domain);
+          }
+          return false;
+        });
+        if (!isAllowed) {
+          return res.status(403).json({ message: "Domain not authorized to use this chatbot" });
+        }
+      }
       // Create lead with chatbot owner's userId
       const leadData = {
         chatbotId,
@@ -471,9 +494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         source,
         status: 'new' as const
       };
-      
       const lead = await storage.createLead(leadData);
-      
       // Send webhook if configured
       if (chatbot.leadsWebhookUrl) {
         try {
@@ -486,7 +507,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Webhook error:", webhookError);
         }
       }
-      
       res.json({ message: "Lead collected successfully", leadId: lead.id });
     } catch (error) {
       console.error("Lead collection error:", error);

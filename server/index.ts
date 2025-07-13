@@ -18,33 +18,44 @@ import { backupService } from "./backup-service";
 const app = express();
 
 // CORS configuration for separate frontend
+// 1. Allow all origins for public widget endpoints
 app.use((req, res, next) => {
-  // Allow requests from frontend development server and production domains
+  // Use originalUrl for matching
+  const isPublicWidgetEndpoint =
+    req.originalUrl.match(/^\/api\/chatbots\/[\w-]+\/public$/) ||
+    req.originalUrl.match(/^\/api\/chat\/[\w-]+\/message$/);
+
+  if (isPublicWidgetEndpoint) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+      return;
+    }
+    return next();
+  }
+
+  // Admin/private APIs (restrict to allowed origins)
   const allowedOrigins = [
     'http://localhost:5173', // Vite dev server
     'http://localhost:3000', // Alternative dev server
-     // Your current frontend origin
+    'http://127.0.0.1:5736',
     'https://your-frontend-domain.vercel.app',
     'https://rank-ved-frontend-rfam.vercel.app',
-    // Production frontend
-    // Add your actual frontend domain here
+    // 'https://demo-bot-six.vercel.app', // Add your deployed frontend if needed
   ];
-  
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
-  
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
-  
-  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
     return;
   }
-  
   next();
 });
 
