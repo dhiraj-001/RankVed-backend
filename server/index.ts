@@ -36,19 +36,8 @@ app.use((req, res, next) => {
     return next();
   }
 
-  // Admin/private APIs (restrict to allowed origins)
-  const allowedOrigins = [
-    'http://localhost:5173', // Vite dev server
-    'http://localhost:3000', // Alternative dev server
-    'http://127.0.0.1:5736',
-    'https://your-frontend-domain.vercel.app',
-    'https://rank-ved-frontend-rfam.vercel.app',
-    // 'https://demo-bot-six.vercel.app', // Add your deployed frontend if needed
-  ];
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
+  // Admin/private APIs (allow all origins, domain restrictions handled in route handlers)
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');

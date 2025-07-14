@@ -192,18 +192,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Chatbot not found" });
       }
       // Domain security validation
-      const origin = req.headers.origin || req.headers.referer;
-      if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
-        const isAllowed = chatbot.allowedDomains.some(domain => {
-          if (origin) {
-            return origin.includes(domain);
+      if (process.env.MODE !== 'development') {
+        const origin = req.headers.origin || req.headers.referer;
+        if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
+          const isAllowed = chatbot.allowedDomains.some(domain => {
+            if (origin) {
+              return origin.includes(domain);
+            }
+            return false;
+          });
+          if (!isAllowed) {
+            return res.status(403).json({ message: "Domain not authorized to use this chatbot" });
           }
-          return false;
-        });
-        if (!isAllowed) {
-          return res.status(403).json({ message: "Domain not authorized to use this chatbot" });
         }
-      }
+      } // In development mode, allow all domains
       // Return only public configuration data
       res.json({
         id: chatbot.id,
@@ -439,7 +441,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.options('/api/leads', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(200).end();
+  });
+
   app.post("/api/leads", async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.status(200).end();
     try {
       const leadData = insertLeadSchema.parse(req.body);
       const lead = await storage.createLead(leadData);
@@ -465,7 +478,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public lead collection endpoint for chat widgets
-  app.post("/api/chat/:chatbotId/leads", async (req, res) => {
+  app.options('/api/chat/:chatbotId/leads', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.status(200).end();
+  });
+
+  app.post('/api/chat/:chatbotId/leads', async (req, res) => {
     try {
       const { chatbotId } = req.params;
       const { name, email, phone, source = 'chat_widget' } = req.body;
@@ -476,15 +496,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Domain security validation
       const origin = req.headers.origin || req.headers.referer;
-      if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
-        const isAllowed = chatbot.allowedDomains.some(domain => {
-          if (origin) {
-            return origin.includes(domain);
+      if (process.env.MODE !== 'development') {
+        if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
+          const isAllowed = chatbot.allowedDomains.some(domain => {
+            if (origin) {
+              return origin.includes(domain);
+            }
+            return false;
+          });
+          if (!isAllowed) {
+            return res.status(403).json({ message: "Domain not authorized to use this chatbot" });
           }
-          return false;
-        });
-        if (!isAllowed) {
-          return res.status(403).json({ message: "Domain not authorized to use this chatbot" });
         }
       }
       // Create lead with chatbot owner's userId
