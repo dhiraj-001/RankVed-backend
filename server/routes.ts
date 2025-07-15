@@ -8,31 +8,35 @@ import { generatePersonalizedRecommendations } from "./ai/onboarding";
 import { getDefaultQuestionFlow } from "./sample-flows";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "./types";
-import cors from "cors";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Allow all origins (for development; restrict in production)
-  app.use(cors({
-    origin: "*", // or specify your frontend URL for production
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }));
+  const allowedOrigins = process.env.FRONTEND_URLS
+    ? process.env.FRONTEND_URLS.split(",")
+    : [];
 
-  // Serve static embed files with CORS headers
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header("Access-Control-Allow-Origin", origin);
+    }
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
+  // Serve static embed files (no extra CORS headers needed, handled by above middleware)
   app.get('/chat-embed.js', (req, res) => {
     res.setHeader('Content-Type', 'application/javascript');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.sendFile(path.join(process.cwd(), 'client/public/chat-embed.js'));
   });
 
   app.get('/chat-embed.css', (req, res) => {
     res.setHeader('Content-Type', 'text/css');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.sendFile(path.join(process.cwd(), 'client/public/chat-embed.css'));
   });
@@ -194,6 +198,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Public endpoint for embed widget configuration
   app.get("/api/chatbots/:id/public", async (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
     try {
       const chatbot = await storage.getChatbot(req.params.id);
       if (!chatbot) {
@@ -248,6 +255,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Chat widget route - serves the chat interface in an iframe
   app.get("/chat/:chatbotId", async (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
     try {
       const chatbot = await storage.getChatbot(req.params.chatbotId);
       if (!chatbot || !chatbot.isActive) {
@@ -310,6 +320,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Chat routes
   app.post("/api/chat/:chatbotId/message", async (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
     try {
       const { message, context } = req.body;
       const chatbot = await storage.getChatbot(req.params.chatbotId);
@@ -450,16 +463,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.options('/api/leads', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     res.status(200).end();
   });
 
   app.post("/api/leads", async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     if (req.method === 'OPTIONS') return res.status(200).end();
     try {
       const leadData = insertLeadSchema.parse(req.body);
@@ -487,13 +500,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Public lead collection endpoint for chat widgets
   app.options('/api/chat/:chatbotId/leads', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     res.status(200).end();
   });
 
   app.post('/api/chat/:chatbotId/leads', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     try {
       const { chatbotId } = req.params;
       const { name, email, phone, source = 'chat_widget' } = req.body;
