@@ -8,8 +8,16 @@ import { generatePersonalizedRecommendations } from "./ai/onboarding";
 import { getDefaultQuestionFlow } from "./sample-flows";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "./types";
+import cors from "cors";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Allow all origins (for development; restrict in production)
+  app.use(cors({
+    origin: "*", // or specify your frontend URL for production
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }));
+
   // Serve static embed files with CORS headers
   app.get('/chat-embed.js', (req, res) => {
     res.setHeader('Content-Type', 'application/javascript');
