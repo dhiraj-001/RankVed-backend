@@ -6,7 +6,6 @@ import { insertUserSchema, insertChatbotSchema, insertLeadSchema } from "@shared
 import { generateGeminiResponse, generateChatResponse, processTrainingData, fetchWebsiteContent } from "./ai/openai";
 import { generatePersonalizedRecommendations } from "./ai/onboarding";
 import { getDefaultQuestionFlow } from "./sample-flows";
-import { z } from "zod";
 import type { AuthenticatedRequest } from "./types";
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const staticDir = process.env.NODE_ENV === 'production'
-  ? path.join(__dirname, 'frontend/dist')
+  ? path.join(__dirname, '/frontend/dist')
   : path.join(__dirname, '../../frontend/public');
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -32,6 +31,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.sendFile(path.join(staticDir, 'chat-embed.css'));
   });
+  console.log('Serving static assets from:', staticDir);
   // Authentication middleware (simplified for demo)
   const authenticateUser = async (req: AuthenticatedRequest, res: any, next: any) => {
     // For demo purposes, automatically create and use a demo user
