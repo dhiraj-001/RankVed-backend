@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const staticDir = process.env.NODE_ENV === 'production'
-  ? path.join(__dirname, '/frontend/dist')
+  ? path.join(__dirname, 'frontend/dist')
   : path.join(__dirname, '../../frontend/public');
 
 export async function registerRoutes(app: Express): Promise<Server> {
