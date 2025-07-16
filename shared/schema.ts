@@ -164,6 +164,16 @@ export const dataBackups = pgTable("data_backups", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Custom Question Templates table
+export const questionTemplates = pgTable("question_templates", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  nodes: jsonb("nodes").notNull(),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   chatbots: many(chatbots),
@@ -270,6 +280,12 @@ export const insertDataBackupSchema = createInsertSchema(dataBackups).omit({
   createdAt: true,
 });
 
+export const insertQuestionTemplateSchema = createInsertSchema(questionTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -285,3 +301,5 @@ export type UsageStats = typeof usageStats.$inferSelect;
 export type InsertUsageStats = z.infer<typeof insertUsageStatsSchema>;
 export type DataBackup = typeof dataBackups.$inferSelect;
 export type InsertDataBackup = z.infer<typeof insertDataBackupSchema>;
+export type QuestionTemplate = typeof questionTemplates.$inferSelect;
+export type InsertQuestionTemplate = z.infer<typeof insertQuestionTemplateSchema>;

@@ -1,4 +1,4 @@
-import { generateChatResponse } from './openai';
+import { generateChatResponse } from "./openai";
 
 interface OnboardingData {
   businessType: string;

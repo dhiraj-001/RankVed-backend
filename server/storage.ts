@@ -19,7 +19,9 @@ import {
   type UsageStats,
   type InsertUsageStats,
   type DataBackup,
-  type InsertDataBackup
+  type InsertDataBackup,
+  questionTemplates,
+  type InsertQuestionTemplate
 } from "@shared/schema";
 import { getDb } from "./db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
@@ -68,6 +70,9 @@ export interface IStorage {
   createDataBackup(backup: InsertDataBackup): Promise<DataBackup>;
   getDataBackups(tableName: string, limit?: number): Promise<DataBackup[]>;
   restoreFromBackup(backupId: number): Promise<boolean>;
+
+  // Question template methods
+  createQuestionTemplate(template: InsertQuestionTemplate): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -385,6 +390,13 @@ export class DatabaseStorage implements IStorage {
       console.error('Backup restoration failed:', error);
       return false;
     }
+  }
+
+  // Question template methods
+  async createQuestionTemplate(template: InsertQuestionTemplate): Promise<any> {
+    const db = await getDb();
+    const [questionTemplate] = await db.insert(questionTemplates).values(template).returning();
+    return questionTemplate;
   }
 }
 

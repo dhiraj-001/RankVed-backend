@@ -3,12 +3,13 @@ import { createServer, type Server } from "http";
 import path from "path";
 import { storage } from "./storage";
 import { insertUserSchema, insertChatbotSchema, insertLeadSchema } from "@shared/schema";
-import { generateChatResponse, processTrainingData, fetchWebsiteContent } from "./ai/openai";
+import { generateGeminiResponse, generateChatResponse, processTrainingData, fetchWebsiteContent } from "./ai/openai";
 import { generatePersonalizedRecommendations } from "./ai/onboarding";
 import { getDefaultQuestionFlow } from "./sample-flows";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "./types";
 import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -166,7 +167,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updates = insertChatbotSchema.partial().parse(req.body);
+      if (updates.trainingData !== undefined) {
+        console.log('[Backend] Received trainingData for save:', updates.trainingData);
+      }
       const updatedChatbot = await storage.updateChatbot(req.params.id, updates);
+      if (updates.trainingData !== undefined) {
+        console.log('[Backend] Training data saved to DB for chatbot', req.params.id);
+      }
       res.json(updatedChatbot);
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -340,7 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Track message count for lead collection
-      const sessionId = req.headers['x-session-id'] as string || `session-${Date.now()}-${Math.random()}`;
+      const sessionId = (req.headers['x-session-id'] as string) || uuidv4();
       const messageCount = context?.messageCount || 0;
       const manualMessageCount = context?.manualMessageCount || 0;
 
@@ -385,15 +392,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         responseType = 'form';
       } else {
         if (chatbot.aiProvider === "google") {
-          // Use Gemini
-          response = await require('./ai/openai').generateGeminiResponse(
-            message,
+          // Use Gemini with training data and system prompt
+          const geminiPrompt = `${chatbot.aiSystemPrompt || "You are a helpful assistant."}\n\n${chatbot.trainingData || ""}\n\nUser: ${message}`;
+          console.log('[Gemini] Prompt sent for chatbot', chatbot.id, ':', geminiPrompt);
+          response = await generateGeminiResponse(
+            geminiPrompt,
             chatbot.customApiKey,
-            chatbot.model || "gemini-1.5-pro"
+            chatbot.model || "gemini-2.5-flash"
           );
         } else {
           // Default to OpenAI
-          response = await require('./ai/openai').generateChatResponse(
+          response = await generateChatResponse(
             message,
             chatbot.aiSystemPrompt || "You are a helpful assistant.",
             chatbot.trainingData || undefined,
@@ -608,6 +617,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Sample flows error:', error);
       res.status(500).json({ error: 'Failed to get sample flows' });
+    }
+  });
+
+  // Save a custom question flow template
+  app.post('/api/question-templates', authenticateUser, async (req, res) => {
+    try {
+      const { name, nodes } = req.body;
+      if (!name || !Array.isArray(nodes)) {
+        return res.status(400).json({ message: 'Name and nodes are required.' });
+      }
+      // Save the template (implement createQuestionTemplate in storage)
+      const template = await storage.createQuestionTemplate({
+        userId: req.user.id,
+        name,
+        nodes,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
   });
 
