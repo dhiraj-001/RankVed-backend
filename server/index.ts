@@ -1,4 +1,3 @@
-
 import dotenv from "dotenv";
 dotenv.config();
 // Load environment variables
@@ -19,11 +18,15 @@ const app = express();
 
 // CORS configuration for separate frontend
 // 1. Allow all origins for public widget endpoints
+const allowedOriginsEnv = process.env.FRONTEND_URLS || '';
+const allowedOrigins = allowedOriginsEnv.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0);
+
 app.use((req, res, next) => {
   // Use originalUrl for matching
   const isPublicWidgetEndpoint =
     req.originalUrl.match(/^\/api\/chatbots\/[\w-]+\/public$/) ||
-    req.originalUrl.match(/^\/api\/chat\/[\w-]+\/message$/);
+    req.originalUrl.match(/^\/api\/chat\/[\w-]+\/message$/) ||
+    req.originalUrl.match(/^\/api\/chat\/[\w-]+\/leads$/); // <-- add this line
 
   if (isPublicWidgetEndpoint) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,8 +39,11 @@ app.use((req, res, next) => {
     return next();
   }
 
-  // Admin/private APIs (allow all origins, domain restrictions handled in route handlers)
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // Admin/private APIs (allow only allowed origins)
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');

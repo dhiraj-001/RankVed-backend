@@ -8,37 +8,28 @@ import { generatePersonalizedRecommendations } from "./ai/onboarding";
 import { getDefaultQuestionFlow } from "./sample-flows";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "./types";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const staticDir = process.env.NODE_ENV === 'production'
+  ? path.join(__dirname, '../../frontend/dist')
+  : path.join(__dirname, '../../frontend/public');
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  const allowedOrigins = process.env.FRONTEND_URLS
-    ? process.env.FRONTEND_URLS.split(",")
-    : [];
-
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
-      res.header("Access-Control-Allow-Origin", origin);
-    }
-    res.header("Access-Control-Allow-Credentials", "true");
-    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
-    if (req.method === "OPTIONS") {
-      return res.sendStatus(200);
-    }
-    next();
-  });
-
   // Serve static embed files (no extra CORS headers needed, handled by above middleware)
+  // Determine static asset directory based on environment
   app.get('/chat-embed.js', (req, res) => {
     res.setHeader('Content-Type', 'application/javascript');
     res.setHeader('Cache-Control', 'public, max-age=300');
-    res.sendFile(path.join(process.cwd(), 'client/public/chat-embed.js'));
+    res.sendFile(path.join(staticDir, 'chat-embed.js'));
   });
 
   app.get('/chat-embed.css', (req, res) => {
     res.setHeader('Content-Type', 'text/css');
     res.setHeader('Cache-Control', 'public, max-age=300');
-    res.sendFile(path.join(process.cwd(), 'client/public/chat-embed.css'));
+    res.sendFile(path.join(staticDir, 'chat-embed.css'));
   });
   // Authentication middleware (simplified for demo)
   const authenticateUser = async (req: AuthenticatedRequest, res: any, next: any) => {
@@ -511,8 +502,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     try {
-      const { chatbotId } = req.params;
-      const { name, email, phone, source = 'chat_widget' } = req.body;
+      // Accept both chatbotId from URL and body for compatibility
+      const chatbotId = req.body.chatbotId || req.params.chatbotId;
+      const { name, email, phone, consentGiven, source = 'chat_widget', conversationContext } = req.body;
       // Get chatbot to find the owner
       const chatbot = await storage.getChatbot(chatbotId);
       if (!chatbot || !chatbot.isActive) {
@@ -533,15 +525,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      // Create lead with chatbot owner's userId
+      // Create lead with chatbot owner's userId and store consent/context
       const leadData = {
         chatbotId,
         userId: chatbot.userId,
         name,
         email,
         phone,
+        consentGiven: !!consentGiven,
         source,
-        status: 'new' as const
+        status: 'new' as const,
+        conversationContext: conversationContext || null
       };
       const lead = await storage.createLead(leadData);
       // Send webhook if configured
@@ -627,7 +621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/chat-widget-embed.js', (req, res) => {
     res.setHeader('Content-Type', 'application/javascript');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.sendFile(path.join(process.cwd(), 'client/public/chat-widget-embed.js'));
+    res.sendFile(path.join(staticDir, 'chat-embed.js'));
   });
 
   // Serve WordPress-compatible embed script
@@ -635,7 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Content-Type', 'application/javascript');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.sendFile(path.join(process.cwd(), 'client/public/wordpress-embed.js'));
+    res.sendFile(path.join(process.cwd(), 'frontend/public/wordpress-embed.js'));
   });
 
   // Serve WordPress-compatible embed script (fixed version)
@@ -680,6 +674,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/simple-test', (req, res) => {
     res.setHeader('Content-Type', 'text/html');
     res.sendFile(path.join(process.cwd(), 'simple-wordpress-test.html'));
+  });
+
+  // Minimal HTML page for iframe embedding
+  app.get('/api/iframe/:chatbotId', (req, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const apiUrl = process.env.VITE_API_URL || '';
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Chatbot</title>
+        <meta name="viewport" content="width=400, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <link rel="stylesheet" href="/chat-embed.css">
+        <style>
+          html, body { height: 100%; margin: 0; padding: 0; background: transparent; }
+          body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        </style>
+      </head>
+      <body>
+        <div id="chatbot-widget-container"></div>
+        <script>
+          window.CHATBOT_CONFIG = {
+            chatbotId: "${req.params.chatbotId}",
+            apiUrl: "${apiUrl}"
+          };
+        </script>
+        <script src="/chat-embed.js"></script>
+      </body>
+      </html>
+    `);
   });
 
   const httpServer = createServer(app);
