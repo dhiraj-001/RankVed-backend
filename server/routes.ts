@@ -151,6 +151,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const chatbotData = insertChatbotSchema.parse({
         ...req.body,
         userId: req.user.id,
+        aiProvider: req.body.aiProvider ?? "google", // Always default to Gemini
+        customApiKey: req.body.customApiKey ?? process.env.GEMINI_API_KEY, // Always default to Gemini key
       });
       const chatbot = await storage.createChatbot(chatbotData);
       res.json(chatbot);
