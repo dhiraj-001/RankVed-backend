@@ -713,6 +713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Content-Type', 'text/html');
     res.setHeader('Access-Control-Allow-Origin', '*');
     const apiUrl = process.env.VITE_API_URL || '';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://your-frontend-url.vercel.app'; // fallback placeholder
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
@@ -720,7 +721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         <meta charset="UTF-8">
         <title>Chatbot</title>
         <meta name="viewport" content="width=400, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <link rel="stylesheet" href="/chat-embed.css">
+        <link rel="stylesheet" href="${frontendUrl}/chat-embed.css">
         <style>
           html, body { height: 100%; margin: 0; padding: 0; background: transparent; }
           body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
@@ -734,7 +735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             apiUrl: "${apiUrl}"
           };
         </script>
-        <script src="/chat-embed.js"></script>
+        <script src="${frontendUrl}/chat-embed.js"></script>
       </body>
       </html>
     `);
