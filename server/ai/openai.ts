@@ -13,11 +13,17 @@ export async function generateChatResponse(
   message: string,
   systemPrompt: string,
   trainingData?: string,
-  customApiKey?: string
+  customApiKey?: string,
+  questionFlow?: any
 ): Promise<string> {
   try {
     const client = customApiKey ? new OpenAI({ apiKey: customApiKey }) : openai;
-    
+
+    let flowInstructions = '';
+    if (questionFlow) {
+      flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n`;
+    }
+
     const systemMessage = `${systemPrompt}
 
 Instructions:
@@ -29,7 +35,7 @@ Instructions:
 - Use proper formatting with line breaks where appropriate.
 - Be friendly and professional.
 
-${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`;
+${flowInstructions}${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`;
 
     const response = await client.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -55,7 +61,7 @@ export async function processTrainingData(content: string): Promise<{
 }> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
@@ -89,7 +95,8 @@ export async function processTrainingData(content: string): Promise<{
 export async function generateGeminiResponse(
   message: string,
   apiKey?: string,
-  model: string = "gemini-2.5-flash"
+  model: string = "gemini-2.5-flash",
+  questionFlow?: any
 ): Promise<string> {
   try {
     const key = apiKey || process.env.GEMINI_API_KEY;
@@ -97,13 +104,18 @@ export async function generateGeminiResponse(
     const ai = new GoogleGenAI({ apiKey: String(key) });
 
     // Add instructions here
+    let flowInstructions = '';
+    if (questionFlow) {
+      flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n`;
+    }
     const instructions = `
 You are an AI assistant designed to provide helpful and accurate information.
 **Key Guidelines:**
 - **Tone:** Always maintain a professional yet friendly and approachable demeanor.
 - **Content Generation:** Utilize the knowledge acquired from your extensive training data. However, it is imperative that you **do not directly copy or reproduce any text verbatim from your training sources.** Instead, synthesize the information, rephrase concepts in your own words, and generate unique, original responses that accurately convey the necessary details.
 - **Clarity:** Prioritize clear, concise, and easily understandable language.
-- **Context:** Ensure your responses are relevant to the user's query and maintain conversational coherence.`
+- **Context:** Ensure your responses are relevant to the user's query and maintain conversational coherence.
+${flowInstructions}`;
 
     const fullMessage = `${instructions}\n\nUser: ${message}`;
 
