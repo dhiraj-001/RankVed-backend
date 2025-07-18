@@ -207,7 +207,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Chatbot not found" });
       }
       // Domain security validation
-      if (process.env.MODE !== 'development') {
+      // Only apply domain restriction for direct API calls, not for iframe-served HTML
+      const isIframe = req.headers['sec-fetch-dest'] === 'iframe' || req.headers['sec-fetch-site'] === 'same-origin';
+      if (!isIframe && process.env.MODE !== 'development') {
         const origin = req.headers.origin || req.headers.referer;
         console.log('[Domain Check] Origin:', origin);
         console.log('[Domain Check] allowedDomains:', chatbot.allowedDomains);
