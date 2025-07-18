@@ -6,8 +6,7 @@ import { GoogleGenAI } from "@google/genai";
 console.log('openai',process.env.OPENAI_API_KEY)
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY  ,
-  organization: process.env.OPENAI_ORG_ID
+  apiKey: String(process.env.OPENAI_API_KEY)
 });
 
 export async function generateChatResponse(
@@ -30,7 +29,7 @@ Instructions:
 ${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`;
 
     const response = await client.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-3.5-turbo",
       messages: [
         { role: "system", content: systemMessage },
         { role: "user", content: message }

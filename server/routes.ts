@@ -209,6 +209,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Domain security validation
       if (process.env.MODE !== 'development') {
         const origin = req.headers.origin || req.headers.referer;
+        console.log('[Domain Check] Origin:', origin);
+        console.log('[Domain Check] allowedDomains:', chatbot.allowedDomains);
         if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
           const isAllowed = chatbot.allowedDomains.some(domain => {
             if (origin) {
@@ -216,6 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             return false;
           });
+          console.log('[Domain Check] isAllowed:', isAllowed);
           if (!isAllowed) {
             return res.status(403).json({ message: "Domain not authorized to use this chatbot" });
           }
