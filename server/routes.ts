@@ -398,7 +398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         response = chatbot.leadCollectionMessage || "To help you better, may I have your name and contact information?";
         responseType = 'form';
       } else {
-        if (chatbot.aiProvider === "google") {
+        if (chatbot.aiProvider === "google" || "platform") {
           // Use Gemini with training data and system prompt
           const geminiPrompt = `${chatbot.aiSystemPrompt || "You are a helpful assistant."}\n\n${chatbot.trainingData || ""}\n\nUser: ${message}`;
           console.log('[Gemini] Prompt sent for chatbot', chatbot.id, ':', geminiPrompt);
