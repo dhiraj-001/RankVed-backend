@@ -21,10 +21,13 @@ export async function generateChatResponse(
     const systemMessage = `${systemPrompt}
 
 Instructions:
-- Provide helpful, conversational responses
-- Keep responses concise but informative
-- Use proper formatting with line breaks where appropriate
-- Be friendly and professional
+- Respond conversationally, as a helpful assistant.
+- Do NOT copy-paste from training data; instead, synthesize and summarize.
+- Use your own words and provide contextually relevant, friendly, and natural responses.
+- If the user asks for something from the training data, paraphrase and explain in a human way.
+- Keep responses concise but informative.
+- Use proper formatting with line breaks where appropriate.
+- Be friendly and professional.
 
 ${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`;
 
@@ -35,7 +38,7 @@ ${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`
         { role: "user", content: message }
       ],
       max_tokens: 800,
-      temperature: 0.7,
+      temperature: 0.8,
     });
 
     return response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
@@ -92,11 +95,22 @@ export async function generateGeminiResponse(
     const key = apiKey || process.env.GEMINI_API_KEY;
     if (!key) throw new Error("No Gemini API key provided");
     const ai = new GoogleGenAI({ apiKey: String(key) });
+
+    // Add instructions here
+    const instructions = `
+You are a helpful, conversational assistant.
+- Do NOT copy-paste from training data; synthesize and summarize.
+- Use your own words and provide contextually relevant, friendly, and natural responses.
+- Be concise but informative.
+`;
+
+    const fullMessage = `${instructions}\n\nUser: ${message}`;
+
     const response = await ai.models.generateContent({
       model,
-      contents: message,
+      contents: fullMessage,
     });
-    return response.text;
+    return response.text || '';
   } catch (error: any) {
     console.error("Gemini API error:", error);
     throw new Error("Failed to generate Gemini response");

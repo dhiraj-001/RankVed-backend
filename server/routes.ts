@@ -730,6 +730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         <style>
           html, body { height: 100%; margin: 0; padding: 0; background: transparent; }
           body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+            
         </style>
       </head>
       <body>
