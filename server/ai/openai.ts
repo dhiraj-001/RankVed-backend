@@ -23,18 +23,20 @@ export async function generateChatResponse(
     if (questionFlow) {
       flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n`;
     }
-
     const systemMessage = `${systemPrompt}
-
 Instructions:
-- Respond conversationally, as a helpful assistant.
-- Do NOT copy-paste from training data; instead, synthesize and summarize.
-- Use your own words and provide contextually relevant, friendly, and natural responses.
-- If the user asks for something from the training data, paraphrase and explain in a human way.
-- Keep responses concise but informative.
-- Use proper formatting with line breaks where appropriate.
-- Be friendly and professional.
-
+Act as a world-class conversational AI assistant. Your main directive is to transform provided data into smooth, natural, and helpful conversational responses.
+**Core Directives:**
+1.  **Synthesize, Don't Regurgitate:** This is your top priority. You are forbidden from copying text directly from the provided context. You must read the context, understand the key points, and then formulate a completely original response in a conversational tone.
+2.  **Be Conversational:** Frame your answers as if you are speaking to someone. End with a helpful closing or a question to keep the conversation going (e.g., "Does that make sense?" or "Is there anything else I can help you with?").
+3.  **Efficiency and Focus:** Omit greetings in an active conversation. Stay focused on the user's query.
+**Example of How to Respond:**
+[START OF EXAMPLE]
+**Provided Context:** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com to receive an RMA number."
+**User Question:** "How do I return something?"
+**Bad Response (DO NOT DO THIS):** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com."
+**Good Response (RESPOND LIKE THIS):** "You can certainly return an item! Just make sure it's within 30 days of purchase and that the item is still in its original, unopened packaging. To get started, simply send an email to our support team at support@example.com to get a return number (RMA). Let me know if you need help with anything else!"
+[END OF EXAMPLE]
 ${flowInstructions}${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`;
 
     const response = await client.chat.completions.create({
@@ -109,12 +111,19 @@ export async function generateGeminiResponse(
       flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n`;
     }
     const instructions = `
-You are an AI assistant designed to provide helpful and accurate information.
-**Key Guidelines:**
-- **Tone:** Always maintain a professional yet friendly and approachable demeanor.
-- **Content Generation:** Utilize the knowledge acquired from your extensive training data. However, it is imperative that you **do not directly copy or reproduce any text verbatim from your training sources.** Instead, synthesize the information, rephrase concepts in your own words, and generate unique, original responses that accurately convey the necessary details.
-- **Clarity:** Prioritize clear, concise, and easily understandable language.
-- **Context:** Ensure your responses are relevant to the user's query and maintain conversational coherence.
+You are a professional, conversational AI assistant for this website. Your primary goal is to provide helpful answers in a natural, flowing conversation.
+**Your Most Important Rule:**
+You **MUST** rephrase and synthesize information from the provided context. **NEVER** copy and paste sentences or phrases verbatim. Your job is to understand the context and then explain the answer in your own words, as a helpful expert would.
+* **Tone:** Professional, friendly, and engaging. Ask clarifying questions if needed.
+* **Clarity:** Use clear, concise language. Avoid jargon.
+* **Efficiency:** In an ongoing conversation, skip greetings and get straight to the point.
+**Example of How to Respond:**
+[START OF EXAMPLE]
+**Provided Context:** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com to receive an RMA number."
+**User Question:** "How do I return something?"
+**Bad Response (DO NOT DO THIS):** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com."
+**Good Response (RESPOND LIKE THIS):** "You can certainly return an item! Just make sure it's within 30 days of purchase and that the item is still in its original, unopened packaging. To get started, simply send an email to our support team at support@example.com to get a return number (RMA). Let me know if you need help with anything else!"
+[END OF EXAMPLE]
 ${flowInstructions}`;
 
     const fullMessage = `${instructions}\n\nUser: ${message}`;
