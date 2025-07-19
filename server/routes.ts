@@ -232,7 +232,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allowedDomains: chatbot.allowedDomains,
         domainRestrictionsEnabled: chatbot.domainRestrictionsEnabled,
         questionFlowEnabled: chatbot.questionFlowEnabled,
-        questionFlow: chatbot.questionFlow
+        questionFlow: chatbot.questionFlow,
+        enableNotificationSound: chatbot.enableNotificationSound,
+        customNotificationSound: chatbot.customNotificationSound
       });
     } catch (error) {
       res.status(500).json({ message: error.message });
@@ -356,6 +358,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                manualMessageCount >= (chatbot.leadCollectionAfterMessages || 3) &&
                                !context?.leadCollected &&
                                manualMessageCount % (chatbot.leadCollectionAfterMessages || 3) === 0;
+
+      // Log questionFlow for debugging
+      console.log('[Route] chatbot.questionFlow:', chatbot.questionFlow);
 
       let response: string;
       let responseType = 'text';
