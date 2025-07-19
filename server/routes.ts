@@ -471,6 +471,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/leads/:id", authenticateUser, async (req, res) => {
+    try {
+      const leadId = parseInt(req.params.id);
+      if (isNaN(leadId)) {
+        return res.status(400).json({ message: "Invalid lead ID" });
+      }
+      
+      const lead = await storage.getLead(leadId);
+      if (!lead || lead.userId !== req.user.id) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      
+      await storage.deleteLead(leadId);
+      res.json({ message: "Lead deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Public lead collection endpoint for chat widgets
   app.options('/api/chat/:chatbotId/leads', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');

@@ -45,7 +45,9 @@ export interface IStorage {
   // Lead methods
   getLeadsByUser(userId: number, chatbotId?: string): Promise<Lead[]>;
   getLeadsByChatbot(chatbotId: string): Promise<Lead[]>;
+  getLead(id: number): Promise<Lead | undefined>;
   createLead(lead: InsertLead): Promise<Lead>;
+  deleteLead(id: number): Promise<void>;
 
   // Chat session methods
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
@@ -206,6 +208,17 @@ export class DatabaseStorage implements IStorage {
       .values(insertLead)
       .returning();
     return lead;
+  }
+
+  async getLead(id: number): Promise<Lead | undefined> {
+    const db = await getDb();
+    const [lead] = await db.select().from(leads).where(eq(leads.id, id));
+    return lead || undefined;
+  }
+
+  async deleteLead(id: number): Promise<void> {
+    const db = await getDb();
+    await db.delete(leads).where(eq(leads.id, id));
   }
 
   async createChatSession(insertSession: InsertChatSession): Promise<ChatSession> {
