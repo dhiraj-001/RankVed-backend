@@ -206,26 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!chatbot) {
         return res.status(404).json({ message: "Chatbot not found" });
       }
-      // Domain security validation
-      // Only apply domain restriction for direct API calls, not for iframe-served HTML
-      const isIframe = req.headers['sec-fetch-dest'] === 'iframe' || req.headers['sec-fetch-site'] === 'same-origin';
-      if (!isIframe && process.env.MODE !== 'development') {
-        const origin = req.headers.origin || req.headers.referer;
-        console.log('[Domain Check] Origin:', origin);
-        console.log('[Domain Check] allowedDomains:', chatbot.allowedDomains);
-        if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
-          const isAllowed = chatbot.allowedDomains.some(domain => {
-            if (origin) {
-              return origin.includes(domain);
-            }
-            return false;
-          });
-          console.log('[Domain Check] isAllowed:', isAllowed);
-          if (!isAllowed) {
-            return res.status(403).json({ message: "Domain not authorized to use this chatbot" });
-          }
-        }
-      } // In development mode, allow all domains
+      // Domain validation removed for iframe serving
       // Return only public configuration data
       res.json({
         id: chatbot.id,
@@ -336,22 +317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Chatbot not found or inactive" });
       }
 
-      // Domain security validation
-      const origin = req.headers.origin || req.headers.referer;
-      if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
-        const isAllowed = chatbot.allowedDomains.some(domain => {
-          if (origin) {
-            return origin.includes(domain);
-          }
-          return false;
-        });
-        
-        if (!isAllowed) {
-          return res.status(403).json({ 
-            message: "Domain not authorized to use this chatbot" 
-          });
-        }
-      }
+      // Domain validation removed for iframe serving
 
       // Track message count for lead collection
       const sessionId = (req.headers['x-session-id'] as string) || uuidv4();
