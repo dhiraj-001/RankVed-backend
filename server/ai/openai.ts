@@ -1,10 +1,13 @@
-import dotenv from 'dotenv'
-dotenv.config()
+import dotenv from 'dotenv';
+dotenv.config();
 
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
-console.log('openai',process.env.OPENAI_API_KEY)
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+
+console.log('openai', process.env.OPENAI_API_KEY);
+
+// The newest OpenAI model is "gpt-4o" which was released May 13, 2024. 
+// Do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
   apiKey: String(process.env.OPENAI_API_KEY)
 });
@@ -23,13 +26,16 @@ export async function generateChatResponse(
     if (questionFlow) {
       flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n`;
     }
+
     const systemMessage = `${systemPrompt}
 Instructions:
 Act as a world-class conversational AI assistant. Your main directive is to transform provided data into smooth, natural, and helpful conversational responses.
+
 **Core Directives:**
-1.  **Synthesize, Don't Regurgitate:** This is your top priority. You are forbidden from copying text directly from the provided context. You must read the context, understand the key points, and then formulate a completely original response in a conversational tone.
-2.  **Be Conversational:** Frame your answers as if you are speaking to someone. End with a helpful closing or a question to keep the conversation going (e.g., "Does that make sense?" or "Is there anything else I can help you with?").
-3.  **Efficiency and Focus:** Omit greetings in an active conversation. Stay focused on the user's query.
+1. **Synthesize, Don't Regurgitate:** This is your top priority. You are forbidden from copying text directly from the provided context. You must read the context, understand the key points, and then formulate a completely original response in a conversational tone.
+2. **Be Conversational:** Frame your answers as if you are speaking to someone. End with a helpful closing or a question to keep the conversation going (e.g., "Does that make sense?" or "Is there anything else I can help you with?").
+3. **Efficiency and Focus:** Omit greetings in an active conversation. Stay focused on the user's query.
+
 **Example of How to Respond:**
 [START OF EXAMPLE]
 **Provided Context:** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com to receive an RMA number."
@@ -37,6 +43,7 @@ Act as a world-class conversational AI assistant. Your main directive is to tran
 **Bad Response (DO NOT DO THIS):** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com."
 **Good Response (RESPOND LIKE THIS):** "You can certainly return an item! Just make sure it's within 30 days of purchase and that the item is still in its original, unopened packaging. To get started, simply send an email to our support team at support@example.com to get a return number (RMA). Let me know if you need help with anything else!"
 [END OF EXAMPLE]
+
 ${flowInstructions}${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`;
 
     const response = await client.chat.completions.create({
@@ -103,20 +110,28 @@ export async function generateGeminiResponse(
   try {
     const key = apiKey || process.env.GEMINI_API_KEY;
     if (!key) throw new Error("No Gemini API key provided");
+    
     const ai = new GoogleGenAI({ apiKey: String(key) });
 
-    // Add instructions here
+    // Add flow instructions if provided
     let flowInstructions = '';
     if (questionFlow) {
       flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n`;
     }
+
     const instructions = `
 You are a professional, conversational AI assistant for this website. Your primary goal is to provide helpful answers in a natural, flowing conversation.
+
 **Your Most Important Rule:**
 You **MUST** rephrase and synthesize information from the provided context. **NEVER** copy and paste sentences or phrases verbatim. Your job is to understand the context and then explain the answer in your own words, as a helpful expert would.
-* **Tone:** Professional, friendly, and engaging. Ask clarifying questions if needed.
-* **Clarity:** Use clear, concise language. Avoid jargon.
-* **Efficiency:** In an ongoing conversation, skip greetings and get straight to the point.
+
+**Response Guidelines:**
+- **Tone:** Professional, friendly, and engaging. Ask clarifying questions if needed.
+- **Clarity:** Use clear, concise language. Avoid jargon.
+- **Efficiency:** In an ongoing conversation, skip greetings and get straight to the point.
+- **Format:** Respond directly to the user's question without including any instructions or formatting markers.
+- **No Instructions in Output:** Do not include any of these instructions in your response to the user.
+
 **Example of How to Respond:**
 [START OF EXAMPLE]
 **Provided Context:** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com to receive an RMA number."
@@ -124,7 +139,10 @@ You **MUST** rephrase and synthesize information from the provided context. **NE
 **Bad Response (DO NOT DO THIS):** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com."
 **Good Response (RESPOND LIKE THIS):** "You can certainly return an item! Just make sure it's within 30 days of purchase and that the item is still in its original, unopened packaging. To get started, simply send an email to our support team at support@example.com to get a return number (RMA). Let me know if you need help with anything else!"
 [END OF EXAMPLE]
-${flowInstructions}`;
+
+${flowInstructions}
+
+**IMPORTANT:** Respond directly to the user's message below. Do not include any of these instructions, formatting, or asterisks in your response.`;
 
     const fullMessage = `${instructions}\n\nUser: ${message}`;
 
@@ -132,7 +150,31 @@ ${flowInstructions}`;
       model,
       contents: fullMessage,
     });
-    return response.text || '';
+    
+    let responseText = response.text || '';
+    
+    // Clean up the response to remove any instruction leakage
+    responseText = responseText
+      // Remove any markdown formatting with double asterisks
+      .replace(/\*\*[^*]+\*\*/g, '')
+      // Remove instruction-like text
+      .replace(/You are a professional[\s\S]*?conversation\./g, '')
+      .replace(/Your primary goal[\s\S]*?conversation\./g, '')
+      .replace(/Your Most Important Rule[\s\S]*?expert would\./g, '')
+      .replace(/Response Guidelines[\s\S]*?Output[\s\S]*?user\./g, '')
+      .replace(/Example of How to Respond[\s\S]*?anything else![\s\S]*?EXAMPLE\]/g, '')
+      .replace(/IMPORTANT[\s\S]*?response\./g, '')
+      // Remove any remaining instruction fragments
+      .replace(/\[START OF EXAMPLE\][\s\S]*?\[END OF EXAMPLE\]/g, '')
+      .replace(/Bad Response[\s\S]*?Good Response[\s\S]*?anything else![\s\S]*?EXAMPLE\]/g, '')
+      // Clean up extra whitespace and formatting
+      .replace(/\n\s*\n\s*\n/g, '\n\n')
+      .replace(/^\s+|\s+$/g, '')
+      // Remove any remaining asterisks or formatting
+      .replace(/^\*+\s*/gm, '')
+      .replace(/\s*\*+$/gm, '');
+    
+    return responseText || 'I apologize, but I couldn\'t generate a proper response. How can I help you?';
   } catch (error: any) {
     console.error("Gemini API error:", error);
     throw new Error("Failed to generate Gemini response");
@@ -217,7 +259,7 @@ export async function fetchWebsiteContent(url: string): Promise<string> {
     
     console.log(`Found ${links.length} additional pages to process`);
     
-    // Fetch content from additional pages (max 5 concurrent)
+    // Fetch content from additional pages (max 8 concurrent)
     const fetchPromises = links.slice(0, 8).map(async (link) => {
       try {
         const pageResponse = await fetch(link, {
