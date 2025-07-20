@@ -360,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                manualMessageCount % (chatbot.leadCollectionAfterMessages || 3) === 0;
 
       // Log questionFlow for debugging
-      console.log('[Route] chatbot.questionFlow:', chatbot.questionFlow);
+      // console.log('[Route] chatbot.questionFlow:', chatbot.questionFlow);
 
       let response: string;
       let responseType = 'text';
@@ -369,10 +369,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         response = chatbot.leadCollectionMessage || "To help you better, may I have your name and contact information?";
         responseType = 'form';
       } else {
-        if (chatbot.aiProvider === "google" || "platform") {
+        if (chatbot.aiProvider === "google" || chatbot.aiProvider === "platform") {
           // Use Gemini with training data and system prompt
           const geminiPrompt = `${chatbot.aiSystemPrompt || "You are a helpful assistant."}\n\n${chatbot.trainingData || ""}\n\nUser: ${message}`;
           console.log('[Gemini] Prompt sent for chatbot', chatbot.id, ':', geminiPrompt);
+          console.log(chatbot.aiProvider)
           response = await generateGeminiResponse(
             geminiPrompt,
             chatbot.customApiKey,
@@ -387,6 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             chatbot.customApiKey,
             chatbot.model // (if you add model support to OpenAI)
           );
+          
         }
       }
 
