@@ -10,6 +10,170 @@ import type { AuthenticatedRequest } from "./types";
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 
+// Intent detection function to connect AI with question flow
+function detectIntentAndTriggerFlow(message: string, flowNodes: any[]): any | null {
+  const lowerMessage = message.toLowerCase();
+  
+  console.log(`[Intent Detection] 🔍 Starting intent analysis for: "${message}"`);
+  console.log(`[Intent Detection] 📊 Available flow nodes:`, flowNodes.map(n => ({ id: n.id, type: n.type, question: n.question || n.text })));
+  
+  // Define intent patterns and their corresponding flow node types
+  const intentPatterns = [
+    {
+      patterns: [
+        'contact info', 'contact information', 'get in touch', 'reach out', 
+        'phone number', 'email', 'address', 'location', 'call', 'speak to', 'talk to',
+        'contact us', 'contact you', 'reach you', 'get contact', 'your contact', 'contact details',
+        'contact form', 'get contact form', 'show contact form', 'need contact form', 'want contact form',
+        'can i get contact form', 'i need contact form', 'contact form please', 'contact form request'
+      ],
+      nodeTypes: ['contact-form', 'multiple-choice'],
+      keywords: ['contact', 'phone', 'email', 'address', 'call', 'reach', 'form']
+    },
+    {
+      patterns: [
+        'pricing', 'price', 'cost', 'how much', 'fee', 'charge', 'quote', 'estimate',
+        'pricing plans', 'pricing options', 'what does it cost', 'how much does it cost',
+        'what are your prices', 'what are your rates', 'how much do you charge',
+        'what is the cost', 'what is the price', 'tell me about pricing',
+        'pricing information', 'price list', 'cost breakdown', 'fee structure'
+      ],
+      nodeTypes: ['multiple-choice', 'statement'],
+      keywords: ['pricing', 'price', 'cost', 'fee', 'quote']
+    },
+    {
+      patterns: [
+        'services', 'what do you do', 'what services', 'offer', 'provide', 'help with',
+        'what can you help', 'what do you offer', 'your services', 'service offerings'
+      ],
+      nodeTypes: ['multiple-choice', 'statement'],
+      keywords: ['services', 'offer', 'provide', 'help']
+    },
+    {
+      patterns: [
+        'book', 'appointment', 'schedule', 'meeting', 'consultation', 'demo', 'call',
+        'book a call', 'schedule a call', 'book appointment', 'schedule meeting'
+      ],
+      nodeTypes: ['contact-form', 'multiple-choice'],
+      keywords: ['book', 'appointment', 'schedule', 'meeting', 'demo']
+    },
+    {
+      patterns: [
+        'portfolio', 'work', 'projects', 'examples', 'case studies', 'show me',
+        'your work', 'previous work', 'examples of work', 'portfolio of work'
+      ],
+      nodeTypes: ['multiple-choice', 'statement'],
+      keywords: ['portfolio', 'work', 'projects', 'examples', 'case studies']
+    }
+  ];
+
+  // Check each intent pattern
+  for (const intent of intentPatterns) {
+    console.log(`[Intent Detection] 🔎 Checking intent pattern:`, intent.keywords[0], '| Patterns:', intent.patterns);
+    
+    const hasMatchingPattern = intent.patterns.some(pattern => 
+      lowerMessage.includes(pattern)
+    );
+    
+          if (hasMatchingPattern) {
+        console.log(`[Intent Detection] ✅ Pattern match found for: ${intent.keywords[0]} | Message: "${message}"`);
+        
+        // Find the best matching node based on type and content
+        const matchingNodes = flowNodes.filter(node => 
+          intent.nodeTypes.includes(node.type) &&
+          (node.question?.toLowerCase().includes(intent.keywords[0]) || 
+           node.options?.some((opt: any) => 
+             opt.text?.toLowerCase().includes(intent.keywords[0])
+           ))
+        );
+        
+        console.log(`[Intent Detection] 🎯 Exact matching nodes:`, matchingNodes.map(n => ({ id: n.id, type: n.type, question: n.question || n.text })));
+        
+        if (matchingNodes.length > 0) {
+          // Score nodes based on match quality
+          const scoredNodes = matchingNodes.map(node => {
+            let score = 0;
+            
+            // Higher score for nodes that are NOT the start node
+            if (node.id !== 'start') score += 10;
+            
+            // Higher score for nodes with the keyword in their question (not just options)
+            if (node.question?.toLowerCase().includes(intent.keywords[0])) score += 5;
+            
+            // Higher score for contact-form type when asking for contact
+            if (intent.keywords[0] === 'contact' && node.type === 'contact-form') score += 3;
+            
+            // Higher score for contact-form type when asking for form specifically
+            if (lowerMessage.includes('form') && node.type === 'contact-form') score += 5;
+            
+            // Higher score for nodes with more specific content
+            if (node.question?.toLowerCase().includes('contact') && intent.keywords[0] === 'contact') score += 2;
+            
+            // Higher score for nodes with "form" in question when user asks for form
+            if (lowerMessage.includes('form') && node.question?.toLowerCase().includes('form')) score += 4;
+            
+            // Higher score for pricing-related nodes when asking about pricing
+            if (intent.keywords[0] === 'pricing' || intent.keywords[0] === 'price' || intent.keywords[0] === 'cost') {
+              if (node.question?.toLowerCase().includes('pricing') || 
+                  node.question?.toLowerCase().includes('price') || 
+                  node.question?.toLowerCase().includes('cost') ||
+                  node.question?.toLowerCase().includes('fee')) {
+                score += 8;
+              }
+              if (node.options?.some((opt: any) => 
+                opt.text?.toLowerCase().includes('pricing') || 
+                opt.text?.toLowerCase().includes('price') || 
+                opt.text?.toLowerCase().includes('cost') ||
+                opt.text?.toLowerCase().includes('fee')
+              )) {
+                score += 6;
+              }
+            }
+            
+            return { node, score };
+          });
+          
+          // Sort by score (highest first)
+          scoredNodes.sort((a, b) => b.score - a.score);
+          
+          console.log(`[Intent Detection] 📊 Node scores:`, scoredNodes.map(s => ({ id: s.node.id, score: s.score, type: s.node.type })));
+          
+          // Only return if the highest score is significantly better than start node
+          const highestScore = scoredNodes[0].score;
+          const startNodeScore = scoredNodes.find(s => s.node.id === 'start')?.score || 0;
+          
+          if (highestScore > startNodeScore + 5) {
+            console.log(`[Intent Detection] 🎉 Returning highest scored match:`, scoredNodes[0].node.id);
+            return scoredNodes[0].node;
+          } else {
+            console.log(`[Intent Detection] ⚠️ Highest score too close to start node, skipping:`, {
+              highestScore,
+              startNodeScore,
+              highestNodeId: scoredNodes[0].node.id
+            });
+          }
+        }
+      
+      // If no exact match, find any node of the preferred types (but avoid start node)
+      const fallbackNodes = flowNodes.filter(node => 
+        intent.nodeTypes.includes(node.type) && node.id !== 'start'
+      );
+      
+      console.log(`[Intent Detection] 🔄 Fallback nodes (excluding start):`, fallbackNodes.map(n => ({ id: n.id, type: n.type, question: n.question || n.text })));
+      
+      if (fallbackNodes.length > 0) {
+        console.log(`[Intent Detection] 🎉 Returning fallback match:`, fallbackNodes[0].id);
+        return fallbackNodes[0];
+      }
+    } else {
+      console.log(`[Intent Detection] ❌ No pattern match for: ${intent.keywords[0]}`);
+    }
+  }
+  
+  console.log(`[Intent Detection] ❌ No intent match found for any pattern`);
+  return null;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -311,13 +475,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
+    
+    const requestId = uuidv4();
+    const startTime = Date.now();
+    
+    console.log(`[${requestId}] 🚀 Chat message request started:`, {
+      chatbotId: req.params.chatbotId,
+      messageLength: req.body.message?.length || 0,
+      hasContext: !!req.body.context,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       const { message, context } = req.body;
       const chatbot = await storage.getChatbot(req.params.chatbotId);
       
       if (!chatbot || !chatbot.isActive) {
+        console.log(`[${requestId}] ❌ Chatbot not found or inactive:`, req.params.chatbotId);
         return res.status(404).json({ message: "Chatbot not found or inactive" });
       }
+
+      console.log(`[${requestId}] ✅ Chatbot found:`, {
+        chatbotId: chatbot.id,
+        chatbotName: chatbot.name,
+        aiProvider: chatbot.aiProvider,
+        questionFlowEnabled: chatbot.questionFlowEnabled
+      });
 
       // Domain validation removed for iframe serving
 
@@ -325,6 +508,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessionId = (req.headers['x-session-id'] as string) || uuidv4();
       const messageCount = context?.messageCount || 0;
       const manualMessageCount = context?.manualMessageCount || 0;
+
+      console.log(`[${requestId}] 📊 Message tracking:`, {
+        sessionId,
+        messageCount,
+        manualMessageCount,
+        hasContext: !!context
+      });
 
       // Create or update chat session
       let session;
@@ -335,9 +525,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId: chatbot.userId,
           sessionData: { messageCount, context }
         });
+        console.log(`[${requestId}] ✅ Chat session created/updated:`, sessionId);
       } catch (error) {
         // Session might already exist, which is fine
-        console.log('Session creation note:', error.message);
+        console.log(`[${requestId}] ℹ️ Session creation note:`, error.message);
       }
 
       // Store user message with persistent backup
@@ -351,6 +542,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { context, messageCount }
       });
       
+      console.log(`[${requestId}] ✅ User message stored:`, {
+        sessionId,
+        messageLength: message.length
+      });
+      
       // Check if lead collection should be triggered (only for manual chats, not flow-based)
       const isManualChat = !context?.isFlowBased && !context?.usingSuggestions;
       const shouldCollectLead = chatbot.leadCollectionEnabled && 
@@ -359,37 +555,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                !context?.leadCollected &&
                                manualMessageCount % (chatbot.leadCollectionAfterMessages || 3) === 0;
 
+      console.log(`[${requestId}] 🔍 Lead collection check:`, {
+        isManualChat,
+        shouldCollectLead,
+        leadCollectionEnabled: chatbot.leadCollectionEnabled,
+        leadCollectionAfterMessages: chatbot.leadCollectionAfterMessages,
+        leadCollected: context?.leadCollected
+      });
+
+      // Check for intent-based question flow triggers
+      let intentTriggeredNode = null;
+      if (chatbot.questionFlowEnabled && chatbot.questionFlow && Array.isArray(chatbot.questionFlow.nodes)) {
+        console.log(`[${requestId}] [Intent Detection] Analyzing message: "${message}" for chatbot ${chatbot.id}`);
+        intentTriggeredNode = detectIntentAndTriggerFlow(message, chatbot.questionFlow.nodes);
+        if (intentTriggeredNode) {
+          console.log(`[${requestId}] [Intent Detection] ✅ Triggered node:`, {
+            nodeId: intentTriggeredNode.id,
+            nodeType: intentTriggeredNode.type,
+            nodeQuestion: intentTriggeredNode.question || intentTriggeredNode.text,
+            chatbotId: chatbot.id,
+            message: message
+          });
+        } else {
+          console.log(`[${requestId}] [Intent Detection] ❌ No intent match found for message: "${message}"`);
+        }
+      } else {
+        console.log(`[${requestId}] [Intent Detection] ⚠️ Question flow not enabled or invalid for chatbot ${chatbot.id}`);
+      }
+
       // Log questionFlow for debugging
       // console.log('[Route] chatbot.questionFlow:', chatbot.questionFlow);
 
       let response: string;
       let responseType = 'text';
+      let triggeredFlowNode = null;
       
-      if (shouldCollectLead) {
-        response = chatbot.leadCollectionMessage || "To help you better, may I have your name and contact information?";
-        responseType = 'form';
-      } else {
-        if (chatbot.aiProvider === "google" || chatbot.aiProvider === "platform") {
-          // Use Gemini with training data and system prompt
-          const geminiPrompt = `${chatbot.aiSystemPrompt || "You are a helpful assistant."}\n\n${chatbot.trainingData || ""}\n\nUser: ${message}`;
-          console.log('[Gemini] Prompt sent for chatbot', chatbot.id, ':', geminiPrompt);
-          console.log(chatbot.aiProvider)
+      // Check for flow nodes first, then generate AI response with flow context
+      let flowContext = null;
+      if (intentTriggeredNode) {
+        console.log(`[${requestId}] [Flow Execution] 🚀 Flow node detected:`, {
+          nodeId: intentTriggeredNode.id,
+          nodeType: intentTriggeredNode.type,
+          chatbotId: chatbot.id
+        });
+        
+        flowContext = { triggeredNode: intentTriggeredNode, flowNodes: chatbot.questionFlow?.nodes };
+        triggeredFlowNode = intentTriggeredNode;
+        responseType = intentTriggeredNode.type === 'contact-form' ? 'form' : 'text';
+        
+        console.log(`[${requestId}] [Flow Execution] 📝 AI will be informed about flow node execution`);
+      }
+      
+      // Generate AI response with flow context if available
+      console.log(`[${requestId}] [AI Generation] 🤖 Generating AI response for user message`);
+      
+      if (chatbot.aiProvider === "google") {
+        console.log(`[${requestId}] [Gemini] Using custom API key:`, !!chatbot.customApiKey);
+        // Use Gemini with training data and system prompt
+        const geminiPrompt = `${chatbot.aiSystemPrompt || "You are a helpful assistant."}\n\n${chatbot.trainingData || ""}\n\nUser: ${message}`;
+        console.log(`[${requestId}] [Gemini] Prompt sent for chatbot`, chatbot.id, ':', geminiPrompt);
+        console.log(`[${requestId}] [Gemini] AI Provider:`, chatbot.aiProvider);
+        
+        if (flowContext) {
+          console.log(`[${requestId}] [AI Integration] 🔗 Passing flow context to Gemini:`, {
+            triggeredNodeId: intentTriggeredNode.id,
+            triggeredNodeType: intentTriggeredNode.type,
+            flowNodesCount: chatbot.questionFlow?.nodes?.length || 0
+          });
+        }
+        
+        try {
           response = await generateGeminiResponse(
             geminiPrompt,
             chatbot.customApiKey,
-            chatbot.model || "gemini-2.5-flash"
+            chatbot.model || "gemini-2.5-flash",
+            flowContext
           );
-        } else {
-          // Default to OpenAI
-          response = await generateChatResponse(
-            message,
-            chatbot.aiSystemPrompt || "You are a helpful assistant.",
-            chatbot.trainingData || undefined,
-            chatbot.customApiKey,
-            chatbot.model // (if you add model support to OpenAI)
-          );
-          
+          console.log(`[${requestId}] [Gemini] ✅ Response generated successfully:`, {
+            responseLength: response.length,
+            responsePreview: response.substring(0, 100) + '...'
+          });
+        } catch (geminiError: any) {
+          console.error(`[${requestId}] [Gemini] API Error:`, geminiError);
+          if (geminiError.message && geminiError.message.includes('API key not valid')) {
+            response = "I'm sorry, there's an issue with the AI service configuration. Please check your API key settings.";
+          } else {
+            response = "I'm sorry, I'm having trouble connecting to the AI service right now. Please try again later.";
+          }
         }
+      } else if (chatbot.aiProvider === "platform") {
+        // Platform provider - use Gemini with environment API key
+        console.log(`[${requestId}] [Platform] Using platform provider with Gemini for chatbot`, chatbot.id);
+        const geminiPrompt = `${chatbot.aiSystemPrompt || "You are a helpful assistant."}\n\n${chatbot.trainingData || ""}\n\nUser: ${message}`;
+        console.log(`[${requestId}] [Platform] Prompt sent for chatbot`, chatbot.id, ':', geminiPrompt);
+        
+        if (flowContext) {
+          console.log(`[${requestId}] [AI Integration] 🔗 Passing flow context to Platform Gemini:`, {
+            triggeredNodeId: intentTriggeredNode.id,
+            triggeredNodeType: intentTriggeredNode.type,
+            flowNodesCount: chatbot.questionFlow?.nodes?.length || 0
+          });
+        }
+        
+        try {
+          response = await generateGeminiResponse(
+            geminiPrompt,
+            process.env.GEMINI_API_KEY, // Use environment variable for platform
+            chatbot.model || "gemini-2.5-flash",
+            flowContext
+          );
+          console.log(`[${requestId}] [Platform] ✅ Response generated successfully:`, {
+            responseLength: response.length,
+            responsePreview: response.substring(0, 100) + '...'
+          });
+        } catch (geminiError: any) {
+          console.error(`[${requestId}] [Platform] Gemini API Error:`, geminiError);
+          if (geminiError.message && geminiError.message.includes('API key not valid')) {
+            response = "I'm sorry, there's an issue with the AI service configuration. Please check your platform API key settings.";
+          } else {
+            response = "I'm sorry, I'm having trouble connecting to the AI service right now. Please try again later.";
+          }
+        }
+      } else {
+        // Default to OpenAI
+        if (flowContext) {
+          console.log(`[${requestId}] [AI Integration] 🔗 Passing flow context to OpenAI:`, {
+            triggeredNodeId: intentTriggeredNode.id,
+            triggeredNodeType: intentTriggeredNode.type,
+            flowNodesCount: chatbot.questionFlow?.nodes?.length || 0
+          });
+        }
+        
+        response = await generateChatResponse(
+          message,
+          chatbot.aiSystemPrompt || "You are a helpful assistant.",
+          chatbot.trainingData || undefined,
+          chatbot.customApiKey,
+          flowContext
+        );
+        console.log(`[${requestId}] [OpenAI] ✅ Response generated successfully:`, {
+          responseLength: response.length,
+          responsePreview: response.substring(0, 100) + '...'
+        });
+      }
+      
+      // Check if AI response should trigger additional flow nodes (only if no user-triggered node)
+      let aiTriggeredNode = null;
+      if (!intentTriggeredNode && chatbot.questionFlowEnabled && chatbot.questionFlow && Array.isArray(chatbot.questionFlow.nodes)) {
+        console.log(`[${requestId}] [AI Intent Detection] 🔍 Analyzing AI response: "${response}" for additional flow nodes`);
+        aiTriggeredNode = detectIntentAndTriggerFlow(response, chatbot.questionFlow.nodes);
+        
+        if (aiTriggeredNode) {
+          console.log(`[${requestId}] [AI Intent Detection] ✅ AI response triggered node:`, {
+            nodeId: aiTriggeredNode.id,
+            nodeType: aiTriggeredNode.type,
+            nodeQuestion: aiTriggeredNode.question || aiTriggeredNode.text,
+            chatbotId: chatbot.id,
+            aiResponse: response.substring(0, 100) + '...'
+          });
+          
+          // Set AI-triggered node as the main triggered node
+          triggeredFlowNode = aiTriggeredNode;
+          responseType = aiTriggeredNode.type === 'contact-form' ? 'form' : 'text';
+          
+          // Update flow context
+          if (flowContext) {
+            flowContext.aiTriggeredNode = aiTriggeredNode;
+          } else {
+            flowContext = { aiTriggeredNode, flowNodes: chatbot.questionFlow?.nodes };
+          }
+        } else {
+          console.log(`[${requestId}] [AI Intent Detection] ❌ No flow nodes triggered by AI response`);
+        }
+      } else if (intentTriggeredNode) {
+        console.log(`[${requestId}] [AI Intent Detection] ⏭️ Skipping AI intent detection - user already triggered node:`, intentTriggeredNode.id);
+      }
+      
+      if (shouldCollectLead) {
+        console.log(`[${requestId}] 📝 Lead collection triggered - overriding response`);
+        response = chatbot.leadCollectionMessage || "To help you better, may I have your name and contact information?";
+        responseType = 'form';
       }
 
       // Store bot response with persistent backup
@@ -403,6 +748,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { shouldCollectLead, messageCount, responseTime: Date.now() }
       });
 
+      console.log(`[${requestId}] ✅ Bot response stored:`, {
+        sessionId,
+        responseLength: response.length,
+        responseType,
+        shouldCollectLead
+      });
+
       // Update usage stats
       try {
         const today = new Date();
@@ -411,22 +763,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
           apiCallCount: 1,
           conversationCount: messageCount === 1 ? 1 : 0
         });
+        console.log(`[${requestId}] ✅ Usage stats updated`);
       } catch (statsError) {
-        console.error("Failed to update usage stats:", statsError);
+        console.error(`[${requestId}] ❌ Failed to update usage stats:`, statsError);
       }
 
-      res.json({ 
+      const responseData = { 
         message: response,
         type: responseType,
         shouldCollectLead,
         messageCount,
+        triggeredFlowNode,
+        aiTriggeredNode, // Include AI-triggered node info
         context: {
           ...context,
           messageCount,
-          shouldCollectLead
+          shouldCollectLead,
+          triggeredFlowNode,
+          aiTriggeredNode
         }
+      };
+      
+      const responseTime = Date.now() - startTime;
+      console.log(`[${requestId}] 📤 Sending response:`, {
+        chatbotId: chatbot.id,
+        responseType: responseType,
+        hasTriggeredFlowNode: !!triggeredFlowNode,
+        triggeredNodeId: triggeredFlowNode?.id,
+        hasAiTriggeredNode: !!aiTriggeredNode,
+        aiTriggeredNodeId: aiTriggeredNode?.id,
+        messageLength: response.length,
+        shouldCollectLead,
+        responseTime: `${responseTime}ms`
       });
+      
+      res.json(responseData);
     } catch (error) {
+      const responseTime = Date.now() - startTime;
+      console.error(`[${requestId}] ❌ Chat message error:`, {
+        error: error.message,
+        responseTime: `${responseTime}ms`,
+        chatbotId: req.params.chatbotId
+      });
       res.status(500).json({ message: error.message });
     }
   });

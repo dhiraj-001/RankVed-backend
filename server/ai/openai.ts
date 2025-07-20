@@ -24,7 +24,7 @@ export async function generateChatResponse(
 
     let flowInstructions = '';
     if (questionFlow) {
-      flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n`;
+      flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n\n**CRITICAL FLOW RULE:** Since there is an active question flow, NEVER introduce yourself or your company. The user is already engaged in a guided conversation. Respond directly to their question without any self-introduction, greetings, or company overview. Focus only on answering their specific question within the context of the ongoing flow.`;
     }
 
     const systemMessage = `${systemPrompt}
@@ -116,14 +116,41 @@ export async function generateGeminiResponse(
     // Add flow instructions if provided
     let flowInstructions = '';
     if (questionFlow) {
-      flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n`;
+      const { triggeredNode, flowNodes } = questionFlow;
+      
+              if (triggeredNode) {
+          console.log(`[AI Flow Context] 🎯 Processing triggered node in AI:`, {
+            nodeId: triggeredNode.id,
+            nodeType: triggeredNode.type,
+            nodeQuestion: triggeredNode.question || triggeredNode.text,
+            flowNodesCount: flowNodes?.length || 0
+          });
+          
+          // User's intent triggered a specific flow node - provide contextual response
+          flowInstructions = `
+**FLOW CONTEXT:** The user's message triggered the "${triggeredNode.type}" flow node: "${triggeredNode.question || triggeredNode.text}"
+
+**RESPONSE STRATEGY:** 
+- Provide a helpful, contextual response to their question
+- Acknowledge that you understand their request
+- If this is a contact-form node, mention that a contact form will appear below for their convenience
+- If this is a multiple-choice node, mention that helpful options will be shown
+- Keep your response natural and conversational
+- Don't repeat the node's question - provide your own helpful response
+
+**Available Flow Nodes:** ${JSON.stringify(flowNodes, null, 2)}
+
+**CRITICAL:** Provide a natural AI response that acknowledges their request. The flow node will be applied automatically in the background.`;
+        } else {
+        flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n\n**CRITICAL FLOW RULE:** Since there is an active question flow, NEVER introduce yourself or your company. The user is already engaged in a guided conversation. Respond directly to their question without any self-introduction, greetings, or company overview. Focus only on answering their specific question within the context of the ongoing flow.`;
+      }
     }
 
     const instructions = `
 You are a professional, conversational AI assistant for this website. Your primary goal is to provide helpful answers in a natural, flowing conversation.
 
 **Your Most Important Rule:**
-You **MUST** rephrase and synthesize information from the provided context. **NEVER** copy and paste sentences or phrases verbatim. Your job is to understand the context and then explain the answer in your own words, as a helpful expert would.
+You **MUST** rephrase and synthesize information from the provided context. **NEVER** copy and paste sentences or phrases verbatim. Your job is to understand the context and then explain the answer in your own words, as a helpful expert would and **never** introduce yourself if there is already a flow in the coversation.
 
 **Response Guidelines:**
 - **Tone:** Professional, friendly, and engaging. Ask clarifying questions if needed.
