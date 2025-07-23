@@ -22,6 +22,18 @@ const allowedOriginsEnv = process.env.FRONTEND_URLS || '';
 const allowedOrigins = allowedOriginsEnv.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0);
 
 app.use((req, res, next) => {
+  // Allow all origins for /api/intent-detect
+  if (req.originalUrl === "/api/intent-detect") {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+      return;
+    }
+    return next();
+  }
+
   // Use originalUrl for matching
   const isPublicWidgetEndpoint =
     req.originalUrl.match(/^\/api\/chatbots\/[\w-]+\/public$/) ||
