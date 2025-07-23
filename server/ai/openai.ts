@@ -3,7 +3,7 @@ dotenv.config();
 
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
-
+import {intentTags, trainingData, TrainingDataItem, getSessionState, globalConfig, FollowUpOption} from "./data.ts"
 console.log('openai', process.env.OPENAI_API_KEY);
 
 // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. 
@@ -206,6 +206,143 @@ ${flowInstructions}
     console.error("Gemini API error:", error);
     throw new Error("Failed to generate Gemini response");
   }
+}
+
+
+// Helper to find a TrainingDataItem by its intent_id
+function getTrainingDataItem(intentId: string): TrainingDataItem | undefined {
+  return trainingData.find(item => item.intent_id === intentId);
+}
+
+// Main response object structure for UI
+export interface ChatResponse {
+  message_text: string;
+  follow_up_buttons: Array<{ text: string; payload: string | object }>; // Payload can be intent_id or more complex
+  cta_button?: { text: string; link: string };
+  // Optionally, add a flag for UI to show "collect contact info" specific UI
+  action_collect_contact_info?: boolean;
+  requested_contact_field?: string; // If action_collect_contact_info is true
+}
+
+export async function detectIntent(
+  message: string,
+  history?: Array<{ role: string; content: string }>
+): Promise<ChatResponse | null> {
+  try {
+    const key = process.env.GEMINI_API_KEY;
+    console.log('key', key);
+    if (!key) throw new Error("No Gemini API key provided");
+    const ai = new GoogleGenAI({ apiKey: String(key) });
+
+    // --- Phase 2: Intent Detection via Gemini ---
+    const instruction = `You are an intent classification AI. Please classify the following message into one of these intent labels: ${intentTags.join(', ')}. Output ONLY the intent label. If you cannot confidently classify, output 'unrecognized_intent'.\n\nMessage: '${message}'`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: instruction }] }], // Use structured parts for content
+    });
+
+    let detectedIntentLabel = response.text?.trim() || 'unrecognized_intent';
+    detectedIntentLabel = detectedIntentLabel.split(/\s|\n|\r/)[0].replace(/[^a-zA-Z_]/g, ''); // Clean up response
+    console.log(`Detected Intent: ${detectedIntentLabel}`);
+
+    // Validate if the detected intent is one of our predefined ones
+    const isRecognizedIntent = intentTags.includes(detectedIntentLabel);
+    const relevantTrainingData = getTrainingDataItem(detectedIntentLabel);
+
+    // --- Phase 3: Generate Chatbot Response based on Detected Intent ---
+    let finalMessageText: string;
+    let finalFollowUpOptions: FollowUpOption[] = [];
+    let finalCtaButton: { text: string; link: string } | undefined;
+
+    if (isRecognizedIntent && relevantTrainingData) {
+      // Always include the plain training data as context
+      const plainTrainingData = JSON.stringify(trainingData, null, 2);
+
+      // Prepare a summary of the follow-up options and CTA button to show next
+      let followUpSummary = '';
+      if (relevantTrainingData.follow_up_options && relevantTrainingData.follow_up_options.length > 0) {
+        followUpSummary = '\n\nThe following options will be shown to the user as follow-up choices:';
+        relevantTrainingData.follow_up_options.forEach((opt, idx) => {
+          followUpSummary += `\n${idx + 1}. ${opt.option_text}`;
+        });
+      }
+      if (relevantTrainingData.cta_button_text && relevantTrainingData.cta_button_link) {
+        followUpSummary += `\n\nThere will also be a special action button: "${relevantTrainingData.cta_button_text}" (link: ${relevantTrainingData.cta_button_link}) that the user can click for more information or to proceed.`;
+      }
+
+      // Prepare conversation history (last 4 turns from history param)
+      let conversationHistory = '';
+      if (history && Array.isArray(history) && history.length > 0) {
+        const last4 = history.slice(-4);
+        conversationHistory = '\n\nRecent conversation history:';
+        last4.forEach(entry => {
+          conversationHistory += `\n${entry.role === 'user' ? 'User' : 'Bot'}: ${entry.content}`;
+        });
+      }
+
+      // Use Gemini to generate a custom response if needed, otherwise use default
+      const botPrompt = `You are a helpful educational chatbot for a university portal named "EduExpress."${conversationHistory}\n\nBased on the user's intent "${detectedIntentLabel}", and the message "${message}", generate a response in TWO PARTS, each as a separate paragraph (with a blank line between them):\n1. First paragraph: directly answer the user's query in a short and friendly way (max 1–2 sentences). Use the following as a reference for your answer: "${relevantTrainingData.default_response_text}".\n2. Second paragraph: if there is a special action button (CTA) available, add a short, clear sentence inviting the user to click it (e.g., "If you'd like to contact us on WhatsApp, just click the button below.").\n${followUpSummary}\n\nHere is the full training data for your reference:\n${plainTrainingData}\n\nReturn only the response text, formatted as two paragraphs.`;
+
+      const customResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash", // Use a model suitable for concise text generation
+        contents: [{ role: "user", parts: [{ text: botPrompt }] }],
+      });
+      finalMessageText = customResponse.text?.trim() || relevantTrainingData.default_response_text;
+
+      finalFollowUpOptions = relevantTrainingData.follow_up_options;
+      finalCtaButton = relevantTrainingData.cta_button_text && relevantTrainingData.cta_button_link
+        ? { text: relevantTrainingData.cta_button_text, link: relevantTrainingData.cta_button_link }
+        : undefined;
+
+    } else {
+      // Intent not recognized or no relevant training data
+      finalMessageText = globalConfig.default_unrecognized_intent_message;
+      finalFollowUpOptions = []; // No specific follow-ups for unrecognized
+      finalCtaButton = { text: globalConfig.default_cta_text, link: globalConfig.default_cta_link };
+    }
+
+    // --- Format Response for UI ---
+    const responseForUI: ChatResponse = {
+      message_text: finalMessageText,
+      follow_up_buttons: finalFollowUpOptions.map(option => ({
+        text: option.option_text,
+        payload: option.associated_intent_id || (option.cta_button_link ? { type: "cta_option", link: option.cta_button_link } : "no_action")
+      })),
+      cta_button: finalCtaButton,
+    };
+
+    return responseForUI;
+
+  } catch (error: any) {
+    console.error("Intent detection error:", error);
+    // Return a default error response with CTA buttons
+    return {
+      message_text: "I apologize, but I'm currently experiencing technical difficulties. Please try again later or contact us directly.",
+      follow_up_buttons: [],
+      cta_button: { text: globalConfig.default_cta_text, link: globalConfig.default_cta_link }
+    };
+  }
+}
+
+// Helper to extract common contact info (can be improved with better NLP/regex)
+function extractContactInfo(message: string, fieldType: string): string | null {
+  message = message.toLowerCase();
+  if (fieldType === 'email') {
+    const emailMatch = message.match(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/);
+    return emailMatch ? emailMatch[0] : null;
+  }
+  if (fieldType === 'phone') {
+    // Basic phone number regex, needs refinement for international formats
+    const phoneMatch = message.match(/(\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+    return phoneMatch ? phoneMatch[0] : null;
+  }
+  return null;
+}
+
+function extractFirstJson(text: string): string | null {
+  const match = text.match(/{[\s\S]*}/);
+  return match ? match[0] : null;
 }
 
 async function extractLinksFromPage(html: string, baseUrl: string): Promise<string[]> {

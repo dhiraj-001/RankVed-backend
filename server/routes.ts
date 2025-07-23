@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import path from "path";
 import { storage } from "./storage";
 import { insertUserSchema, insertChatbotSchema, insertLeadSchema } from "@shared/schema";
-import { generateGeminiResponse, generateChatResponse, processTrainingData, fetchWebsiteContent } from "./ai/openai";
+import { generateGeminiResponse, generateChatResponse, processTrainingData, fetchWebsiteContent, detectIntent } from "./ai/openai";
 import { generatePersonalizedRecommendations } from "./ai/onboarding";
 import { getDefaultQuestionFlow } from "./sample-flows";
 import type { AuthenticatedRequest } from "./types";
@@ -1115,6 +1115,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       </body>
       </html>
     `);
+  });
+
+  // CORS preflight for /api/intent-detect (identical to chat message route)
+  app.options("/api/intent-detect", (req, res) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
+    res.status(200).end();
+  });
+
+  app.post("/api/intent-detect", async (req: Request, res: Response) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
+    try {
+      const { message, history, chatbotId } = req.body;
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "Missing or invalid 'message' in request body" });
+      }
+      // --- Domain validation logic ---
+      // If chatbotId is provided, check allowedDomains only in production
+      if (chatbotId) {
+        const chatbot = await storage.getChatbot(chatbotId);
+        if (
+          process.env.MODE === "production" &&
+          chatbot &&
+          chatbot.allowedDomains &&
+          chatbot.allowedDomains.length > 0
+        ) {
+          const origin = req.headers.origin || req.headers.referer;
+          const isAllowed = chatbot.allowedDomains.some(domain => {
+            if (origin) {
+              return origin.includes(domain);
+            }
+            return false;
+          });
+          if (!isAllowed) {
+            return res.status(403).json({ error: "Domain not authorized to use this chatbot" });
+          }
+        }
+      }
+      // Pass history to detectIntent
+      const intent = await detectIntent(message, history);
+      res.json({ intent });
+    } catch (error: any) {
+      console.error("Intent detection route error:", error);
+      res.status(500).json({ error: "Failed to detect intent" });
+    }
   });
 
   const httpServer = createServer(app);
