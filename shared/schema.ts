@@ -1,7 +1,8 @@
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import { number, z } from "zod";
+import { trainingData } from "server/ai/data";
 
 // Users table for multi-tenant support
 export const users = pgTable("users", {
@@ -73,23 +74,27 @@ export const chatbots = pgTable("chatbots", {
   // Appearance
   title: text("title").default("Chat with us"),
   primaryColor: text("primary_color").default("#6366F1"),
+  secondaryColor: text("secondary_color").default("#797cf6d4"),
   showWelcomePopup: boolean("show_welcome_popup").default(true),
   suggestionButtons: text("suggestion_buttons"), // JSON string array
   inputPlaceholder: text("input_placeholder").default("Type your message..."),
   leadButtonText: text("lead_button_text").default("Get Started"),
   
   // Training Data
-  trainingData: text("training_data"),
-  
-  // Question Flow
-  questionFlow: jsonb("question_flow"), // JSON object representing the flow
-  questionFlowEnabled: boolean("question_flow_enabled").default(false), // Enable/disable question flow suggestions
-  
+  trainingData: text("training_data").default(JSON.stringify(trainingData)),
+  plainData: text("plain_data"),
+
   // Suggested Questions Configuration
   suggestionTiming: text("suggestion_timing").default("initial"), // initial, after_welcome, after_first_message, manual
   suggestionPersistence: text("suggestion_persistence").default("until_clicked"), // until_clicked, always_visible, hide_after_timeout
   suggestionTimeout: integer("suggestion_timeout").default(30000), // ms - for hide_after_timeout
   
+  //CTA Button
+  whatsapp: text("whatsapp").default(""),
+  email: text("email").default(""),
+  phone: text("phone").default(""),
+  website: text("website").default(""),
+
   // Lead Collection
   leadCollectionEnabled: boolean("lead_collection_enabled").default(true),
   leadCollectionAfterMessages: integer("lead_collection_after_messages").default(3),

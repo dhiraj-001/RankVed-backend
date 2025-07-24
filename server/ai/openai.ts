@@ -271,6 +271,10 @@ export async function detectIntent(
         followUpSummary += `\n\nThere will also be a special action button: "${relevantTrainingData.cta_button_text}" (link: ${relevantTrainingData.cta_button_link}) that the user can click for more information or to proceed.`;
       }
 
+      // Log follow-up and CTA button data
+      console.log('[AI] Follow-up options:', relevantTrainingData.follow_up_options);
+      console.log('[AI] CTA button:', relevantTrainingData.cta_button_text, relevantTrainingData.cta_button_link);
+
       // Prepare conversation history (last 4 turns from history param)
       let conversationHistory = '';
       if (history && Array.isArray(history) && history.length > 0) {
@@ -312,6 +316,7 @@ export async function detectIntent(
       cta_button: finalCtaButton,
     };
 
+    console.log('[AI] Final ChatResponse for UI:', responseForUI);
     return responseForUI;
 
   } catch (error: any) {

@@ -1,9 +1,5 @@
 import dotenv from "dotenv";
 dotenv.config();
-// Load environment variables
-console.log('process.env.DATABASE_URL:', process.env.DATABASE_URL);
-console.log('process.env.OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
-
 
 // Log the database URL for debugging
 console.log(process.env.DATABASE_URL);
