@@ -1,7 +1,7 @@
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
-import { number, z } from "zod";
+import { z } from "zod";
 import { trainingData } from "server/ai/data";
 
 // Users table for multi-tenant support
@@ -81,7 +81,7 @@ export const chatbots = pgTable("chatbots", {
   leadButtonText: text("lead_button_text").default("Get Started"),
   
   // Training Data
-  trainingData: text("training_data").default(JSON.stringify(trainingData)),
+  trainingData: jsonb("training_data").default(trainingData),
   plainData: text("plain_data"),
 
   // Suggested Questions Configuration

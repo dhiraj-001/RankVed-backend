@@ -9,6 +9,7 @@ import { getDefaultQuestionFlow } from "./sample-flows";
 import type { AuthenticatedRequest } from "./types";
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
+import { generateFlowControlledTrainingData } from "./ai/training";
 
 // Intent detection function to connect AI with question flow
 function detectIntentAndTriggerFlow(message: string, flowNodes: any[]): any | null {
@@ -333,13 +334,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Chatbot not found" });
       }
 
+      // Only allow updates for fields present in the schema
       const updates = insertChatbotSchema.partial().parse(req.body);
+      // Only log fields that are in the schema
       if (updates.trainingData !== undefined) {
         console.log('[Backend] Received trainingData for save:', updates.trainingData);
       }
+      if (updates.plainData !== undefined) {
+        console.log('[Backend] Received plainData for save:', updates.plainData);
+      }
+      // No logging or handling for non-schema fields
       const updatedChatbot = await storage.updateChatbot(req.params.id, updates);
       if (updates.trainingData !== undefined) {
         console.log('[Backend] Training data saved to DB for chatbot', req.params.id);
+      }
+      if (updates.plainData !== undefined) {
+        console.log('[Backend] Plain data saved to DB for chatbot', req.params.id);
       }
       res.json(updatedChatbot);
     } catch (error) {
@@ -965,6 +975,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate Gemini-based training data (flow-controlled)
+  // Test in Postman:
+  // POST http://localhost:3000/api/training/generate
+  // Body (JSON): { "content": "Your university info here..." }
+  app.post("/api/training/generate", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { content } = req.body;
+      console.log(`[Training] Request received from user: ${req.user?.email || req.user?.id}, content length: ${content?.length}`);
+      if (!content || typeof content !== "string") {
+        console.log("[Training] Invalid or missing content in request body");
+        return res.status(400).json({ message: "Missing or invalid 'content' in request body" });
+      }
+      console.log("[Training] Calling generateFlowControlledTrainingData...");
+      const result = await generateFlowControlledTrainingData(content);
+      console.log("[Training] Training data generated successfully. Intent:", result.intent_id);
+      res.json(result);
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error("[Training] Error generating training data:", errMsg);
+      res.status(500).json({ message: errMsg });
+    }
+  });
+
   // Chat session routes
   app.post("/api/chat-sessions", async (req, res) => {
     try {
@@ -1136,19 +1169,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).end();
   });
   
-  app.post("/api/intent-detect", async (req: Request, res: Response) => {
+  app.post("/api/intent-detect/:chatbotId", async (req: Request, res: Response) => {
     const origin = req.headers.origin?.toString();
     setCORSHeaders(res, origin);
     try {
-      const { message, history, chatbotId } = req.body;
+      const { message, history } = req.body;
+      const { chatbotId } = req.params;
       
       if (!message || typeof message !== "string") {
         return res.status(400).json({ error: "Missing or invalid 'message' in request body" });
       }
-  
-      // --- Domain validation logic removed ---
-  
-      const intent = await detectIntent(message, history);
+
+      if (!chatbotId || typeof chatbotId !== "string") {
+        return res.status(400).json({ error: "Missing or invalid 'chatbotId' in URL parameter" });
+      }
+
+      // --- Domain validation logic restored ---
+      if (process.env.MODE !== 'development') {
+        const chatbot = await storage.getChatbot(chatbotId);
+        if (chatbot && chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
+          const isAllowed = chatbot.allowedDomains.some(domain => {
+            if (origin) {
+              return origin.includes(domain);
+            }
+            return false;
+          });
+          if (!isAllowed) {
+            return res.status(403).json({ error: "Domain not authorized to use this chatbot" });
+          }
+        }
+      }
+
+      const intent = await detectIntent(message, chatbotId, history);
       res.json({ intent });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to detect intent" });
