@@ -249,7 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ user: { ...user, password: undefined } });
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 
@@ -308,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(chatbot);
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 
@@ -367,7 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteChatbot(req.params.id);
       res.json({ message: "Chatbot deleted successfully" });
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 
@@ -412,7 +412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customNotificationSound: chatbot.customNotificationSound
       });
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 
@@ -827,7 +827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leads = await storage.getLeadsByUser(req.user.id, chatbotId);
       res.json(leads);
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 
@@ -882,7 +882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteLead(leadId);
       res.json({ message: "Lead deleted successfully" });
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 
@@ -961,7 +961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await processTrainingData(content);
       res.json(result);
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 
@@ -971,7 +971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const content = await fetchWebsiteContent(url);
       res.json({ content });
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 
@@ -1005,7 +1005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const session = await storage.createChatSession(sessionData);
       res.json(session);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: (error as Error).message });
     }
   });
 
@@ -1015,7 +1015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const session = await storage.updateChatSession(req.params.id, updates);
       res.json(session);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: (error as Error).message });
     }
   });
 
@@ -1048,7 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(template);
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: (error as Error).message });
     }
   });
 
@@ -1204,6 +1204,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ intent });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to detect intent" });
+    }
+  });
+
+  // Get chat history for a chatbot
+  app.get('/api/chatbots/:id/history', async (req, res) => {
+    try {
+      const chatbot = await storage.getChatbot(req.params.id);
+      if (!chatbot) {
+        return res.status(404).json({ message: 'Chatbot not found' });
+      }
+      // You may need to implement getChatMessagesByChatbotId in your storage layer
+      let messages = await storage.getChatMessagesByChatbot(req.params.id);
+      messages = messages.reverse(); // Return oldest first
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

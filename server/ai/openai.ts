@@ -260,6 +260,11 @@ export async function detectIntent(
     // Dynamically extract intent tags from training data
     const dynamicIntentTags = extractIntentTags(trainingData);
 
+    // --- Lead collection AI instruction ---
+    const leadCollectionInstruction = chatbot.leadCollectionEnabled
+      ? ''
+      : '\n\n**IMPORTANT:** Do NOT mention abuot direct contact (such as phone, WhatsApp, email) in your response. ';
+
     // Log the key fields used for AI logic
     // console.log('[detectIntent] Using fields:', {
     //   plainData,
@@ -355,6 +360,7 @@ Website: ${website || "Not available"}
       // Prepare bot prompt
       const systemPrompt = aiSystemPrompt || "You are a helpful chatbot.";
       const botPrompt = `${systemPrompt}${conversationHistory}
+${leadCollectionInstruction}
 
 Based on the user's intent "${detectedIntentLabel}", and the message "${message}", generate a response that is:
 - As relevant and concise as possible.
