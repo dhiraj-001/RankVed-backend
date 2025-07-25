@@ -256,7 +256,7 @@ export async function detectIntent(
     // --- LOGGING: Fetch and log chatbot data from backend ---
     const chatbot = await storage.getChatbot(chatbotId);
     if (!chatbot) throw new Error("Chatbot not found");
-    const { plainData, trainingData, phone, whatsapp, website, aiProvider, customApiKey, model } = chatbot;
+    const { plainData, trainingData, phone, whatsapp, website, aiProvider, customApiKey, model, aiSystemPrompt } = chatbot;
     // Dynamically extract intent tags from training data
     const dynamicIntentTags = extractIntentTags(trainingData);
 
@@ -353,7 +353,8 @@ Website: ${website || "Not available"}
       }
 
       // Prepare bot prompt
-      const botPrompt = `You are a helpful chatbot.${conversationHistory}
+      const systemPrompt = aiSystemPrompt || "You are a helpful chatbot.";
+      const botPrompt = `${systemPrompt}${conversationHistory}
 
 Based on the user's intent "${detectedIntentLabel}", and the message "${message}", generate a response that is:
 - As relevant and concise as possible.

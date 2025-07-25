@@ -35,6 +35,7 @@ Your primary goal is to create a set of chatbot flows that are:
 7. Always include basic intents such as greetings (hello, hi), goodbyes (bye, goodbye), and similar common conversational intents, even if not present in the input. These should have simple, friendly responses.
 8. Generate as many distinct intents as possible from the input, covering all possible topics and subtopics.
 9. Keep all follow-up button names as short as possible (1-3 words, clear and direct).
+10. **IMPORTANT:** For any main action or external link (such as 'Contact Us', 'View Courses', 'Enroll Now', etc.), ALWAYS use the cta_button_text and cta_button_link fields. Do NOT place these as follow_up_options. Only use follow_up_options for intent navigation or secondary actions that do not involve external links or main CTAs.
 
 Instructions for generating each TrainingDataItem in the list:
 - Derive an intent_id from each distinct topic in the provided text.
@@ -43,7 +44,7 @@ Instructions for generating each TrainingDataItem in the list:
 - Populate follow_up_options:
     - Generate 0-3 options. Prioritize leading to more specific (connected) intents or to direct contact.
     - Use associated_intent_id to link to other intents derived from these or other provided texts.
-    - Use cta_button_text and cta_button_link for direct external links.
+    - Do NOT use cta_button_text or cta_button_link in follow_up_options. Only use these for the main CTA button.
     - Set collect_contact_info: true when asking for user contact details.
     - All follow-up button names must be as short as possible (1-3 words).
 - Populate cta_button_text and cta_button_link for the main intent: The primary call to action for this intent's response, often a link to a relevant webpage. Prefer WhatsApp/Call for concluding or escalating points.
