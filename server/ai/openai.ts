@@ -318,17 +318,8 @@ Website: ${website || "Not available"}
     // 5. Prepare response
     const isRecognizedIntent = dynamicIntentTags.includes(detectedIntentLabel);
     let relevantTrainingData = getTrainingDataItem(trainingData, detectedIntentLabel);
-    // Always add follow-up options to greetings intent if missing
-    if (relevantTrainingData && relevantTrainingData.intent_id && relevantTrainingData.intent_id.includes('greet') && (!Array.isArray(relevantTrainingData.follow_up_options) || relevantTrainingData.follow_up_options.length === 0)) {
-      relevantTrainingData = {
-        ...relevantTrainingData,
-        follow_up_options: [
-          { option_text: 'View Courses', associated_intent_id: 'course_inquiry' },
-          { option_text: 'Admission Info', associated_intent_id: 'admission_process' },
-          { option_text: 'Contact Support', associated_intent_id: 'technical_support' }
-        ]
-      };
-    }
+  
+
     console.log(relevantTrainingData)
     let finalMessageText: string;
     let finalFollowUpOptions: FollowUpOption[] = [];
@@ -359,8 +350,14 @@ Website: ${website || "Not available"}
 
       // Prepare bot prompt
       const systemPrompt = aiSystemPrompt || "You are a helpful chatbot.";
+      
+      // Add special instruction for greetings to always mention follow-up options
+      const greetingInstruction = detectedIntentLabel.toLowerCase().includes('greeting') 
+        ? '\n\n**SPECIAL GREETING INSTRUCTION:** Since this is a greeting intent, always end your response by mentioning that helpful options are available below for the user to explore. Make it natural and inviting, such as "Feel free to explore the options below to get started!" or "I\'ve provided some helpful options below for you to explore."'
+        : '';
+      
       const botPrompt = `${systemPrompt}${conversationHistory}
-${leadCollectionInstruction}
+${leadCollectionInstruction}${greetingInstruction}
 
 Based on the user's intent "${detectedIntentLabel}", and the message "${message}", generate a response that is:
 - As relevant and concise as possible.

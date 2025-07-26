@@ -32,7 +32,7 @@ Your primary goal is to create a set of chatbot flows that are:
 4. Properly Ended: Flows should gracefully conclude either by providing final information, directing to a specific external resource (with a relevant CTA), or offering direct contact options.
 5. Interconnectedness: Identify logical connections between the intents derived from different text snippets. Use associated_intent_id in follow_up_options to create these links.
 6. Comprehensive: Ensure all key information from the input text is covered by at least one intent.
-7. Always include basic intents such as greetings (hello, hi), goodbyes (bye, goodbye), and similar common conversational intents, even if not present in the input. These should have simple, friendly responses.
+7. **CRITICAL GREETING RULE:** Always include basic intents such as greetings (hello, hi), goodbyes (bye, goodbye), and similar common conversational intents, even if not present in the input. **MOST IMPORTANTLY:** Every greeting intent MUST have at least 3-4 follow_up_options. Greeting intents are the entry point to conversations and must provide clear navigation paths for users. Never leave a greeting intent without follow-up options.
 8. Generate as many distinct intents as possible from the input, covering all possible topics and subtopics.
 9. Keep all follow-up button names as short as possible (1-3 words, clear and direct).
 10. **IMPORTANT:** For any main action or external link (such as 'Contact Us', 'View Courses', 'Enroll Now', etc.), ALWAYS use the cta_button_text and cta_button_link fields. Do NOT place these as follow_up_options. Only use follow_up_options for intent navigation or secondary actions that do not involve external links or main CTAs.
@@ -42,7 +42,8 @@ Instructions for generating each TrainingDataItem in the list:
 - Generate nlp_training_phrases: At least 3-5 realistic user queries for each intent.
 - Craft default_response_text: A concise, 1-2 sentence bot message. dont make it too long.
 - Populate follow_up_options:
-    - Generate 0-3 options. Prioritize leading to more specific (connected) intents or to direct contact.
+    - **GREETING INTENTS:** MUST have 3-4 follow_up_options. These are critical entry points and must provide clear navigation.
+    - **OTHER INTENTS:** Generate 0-3 options. Prioritize leading to more specific (connected) intents or to direct contact.
     - Use associated_intent_id to link to other intents derived from these or other provided texts.
     - Do NOT use cta_button_text or cta_button_link in follow_up_options. Only use these for the main CTA button.
     - Set collect_contact_info: true when asking for user contact details.
@@ -59,6 +60,19 @@ Paragraph B: Our Computer Science program focuses on AI, machine learning, and s
 
 Example Output (showing connection):
 [
+  {
+    "intent_id": "general_greeting",
+    "nlp_training_phrases": ["hello", "hi", "hey", "good morning", "greetings"],
+    "default_response_text": "Hello! Welcome to EduExpress University. How can I assist you today?",
+    "follow_up_options": [
+      { "option_text": "Academic Programs", "associated_intent_id": "academic_programs_overview" },
+      { "option_text": "Admission Info", "associated_intent_id": "admission_info" },
+      { "option_text": "About University", "associated_intent_id": "about_university" },
+      { "option_text": "Contact Support", "associated_intent_id": "connect_to_human" }
+    ],
+    "cta_button_text": "Visit Our Website",
+    "cta_button_link": "https://www.eduexpress.edu"
+  },
   {
     "intent_id": "academic_programs_overview",
     "nlp_training_phrases": ["what programs do you have", "list of degrees", "academic fields"],
