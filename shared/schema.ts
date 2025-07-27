@@ -43,9 +43,14 @@ export const chatbots = pgTable("chatbots", {
   welcomeMessage: text("welcome_message").default("Hello! How can I help you today?"),
   initialMessageDelay: integer("initial_message_delay").default(1000), // ms
   
-  // Notifications
-  enableNotificationSound: boolean("enable_notification_sound").default(true),
-  customNotificationSound: text("custom_notification_sound"), // Data URI
+  // Popup Sound
+  popupSoundEnabled: boolean("popup_sound_enabled").default(true),
+  customPopupSound: text("custom_popup_sound"), // Data URI for custom popup sound
+  popupSoundVolume: integer("popup_sound_volume").default(50), // 0-100
+  
+  // Timing & Delays
+  popupDelay: integer("popup_delay").default(2000), // ms - delay before showing popup
+  replyDelay: integer("reply_delay").default(1000), // ms - delay before showing bot reply
   
   // Integrations
   leadsWebhookUrl: text("leads_webhook_url"),
@@ -81,7 +86,7 @@ export const chatbots = pgTable("chatbots", {
   leadButtonText: text("lead_button_text").default("Get Started"),
   
   // Training Data
-  trainingData: jsonb("training_data").default(trainingData),
+  trainingData: text("training_data").default(JSON.stringify(trainingData)),
   plainData: text("plain_data"),
 
   // Suggested Questions Configuration

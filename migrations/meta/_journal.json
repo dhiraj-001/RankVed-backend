@@ -8,6 +8,20 @@
       "when": 1753408518859,
       "tag": "0000_nostalgic_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1753544533108,
+      "tag": "0001_familiar_rhodey",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1753559362996,
+      "tag": "0002_bizarre_synch",
+      "breakpoints": true
     }
   ]
 }

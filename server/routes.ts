@@ -10,6 +10,8 @@ import type { AuthenticatedRequest } from "./types";
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import { generateFlowControlledTrainingData } from "./ai/training";
+import { PopupSoundManager } from './sound-management';
+import { ChatHistoryManager } from './chat-history-manager';
 
 // Intent detection function to connect AI with question flow
 function detectIntentAndTriggerFlow(message: string, flowNodes: any[]): any | null {
@@ -1207,19 +1209,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get chat history for a chatbot
-  app.get('/api/chatbots/:id/history', async (req, res) => {
+  // Enhanced Chat History Routes
+  app.get('/api/chatbots/:id/history', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const chatbot = await storage.getChatbot(req.params.id);
       if (!chatbot) {
         return res.status(404).json({ message: 'Chatbot not found' });
       }
-      // You may need to implement getChatMessagesByChatbotId in your storage layer
-      let messages = await storage.getChatMessagesByChatbot(req.params.id);
-      messages = messages.reverse(); // Return oldest first
+      
+      const { limit, offset, startDate, endDate, sessionId, sender, messageType } = req.query;
+      
+      const options = {
+        limit: limit ? parseInt(limit as string) : 100,
+        offset: offset ? parseInt(offset as string) : 0,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        sessionId: sessionId as string,
+        sender: sender as 'user' | 'bot',
+        messageType: messageType as string
+      };
+      
+      const messages = await ChatHistoryManager.getChatHistory(req.params.id, options);
       res.json(messages);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get chat sessions summary
+  app.get('/api/chatbots/:id/sessions', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const chatbot = await storage.getChatbot(req.params.id);
+      if (!chatbot) {
+        return res.status(404).json({ message: 'Chatbot not found' });
+      }
+      
+      const sessions = await ChatHistoryManager.getChatSessionsSummary(req.params.id);
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get chat history statistics
+  app.get('/api/chatbots/:id/stats', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const chatbot = await storage.getChatbot(req.params.id);
+      if (!chatbot) {
+        return res.status(404).json({ message: 'Chatbot not found' });
+      }
+      
+      const stats = await ChatHistoryManager.getChatHistoryStats(req.params.id);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Search chat history
+  app.get('/api/chatbots/:id/search', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const chatbot = await storage.getChatbot(req.params.id);
+      if (!chatbot) {
+        return res.status(404).json({ message: 'Chatbot not found' });
+      }
+      
+      const { q, limit, offset } = req.query;
+      if (!q) {
+        return res.status(400).json({ message: 'Search term is required' });
+      }
+      
+      const options = {
+        limit: limit ? parseInt(limit as string) : 100,
+        offset: offset ? parseInt(offset as string) : 0
+      };
+      
+      const results = await ChatHistoryManager.searchChatHistory(req.params.id, q as string, options);
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Export chat history
+  app.get('/api/chatbots/:id/export', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const chatbot = await storage.getChatbot(req.params.id);
+      if (!chatbot) {
+        return res.status(404).json({ message: 'Chatbot not found' });
+      }
+      
+      const { format = 'json' } = req.query;
+      const exportData = await ChatHistoryManager.exportChatHistory(req.params.id, format as 'json' | 'csv');
+      
+      if (format === 'csv') {
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="chat-history-${req.params.id}-${new Date().toISOString().split('T')[0]}.csv"`);
+      } else {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="chat-history-${req.params.id}-${new Date().toISOString().split('T')[0]}.json"`);
+      }
+      
+      res.send(exportData);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get recent conversations
+  app.get('/api/chatbots/:id/recent', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const chatbot = await storage.getChatbot(req.params.id);
+      if (!chatbot) {
+        return res.status(404).json({ message: 'Chatbot not found' });
+      }
+      
+      const { limit = 10 } = req.query;
+      const conversations = await ChatHistoryManager.getRecentConversations(req.params.id, parseInt(limit as string));
+      res.json(conversations);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Popup Sound Management Routes
+app.post('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { chatbotId } = req.params;
+    const { enabled, volume, customSoundUrl } = req.body;
+
+    const success = await PopupSoundManager.updateChatbotPopupSoundConfig(chatbotId, {
+      enabled,
+      volume,
+      customSoundUrl
+    });
+
+    if (success) {
+      res.json({ success: true, message: 'Popup sound configuration updated successfully' });
+    } else {
+      res.status(500).json({ success: false, message: 'Failed to update popup sound configuration' });
+    }
+  } catch (error: any) {
+    console.error('Error updating popup sound config:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { chatbotId } = req.params;
+    const config = await PopupSoundManager.getChatbotPopupSoundConfig(chatbotId);
+    res.json({ success: true, config });
+  } catch (error: any) {
+    console.error('Error getting popup sound config:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
     }
   });
 
