@@ -5,6 +5,7 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import {  TrainingDataItem, globalConfig, FollowUpOption } from "./data.ts"
 import { storage } from "../storage";
+import { v4 as uuidv4 } from 'uuid';
 console.log('openai', process.env.OPENAI_API_KEY);
 
 // The newest OpenAI model is "gpt-4o" which was released May 13, 2024. 
@@ -245,20 +246,50 @@ export interface ChatResponse {
   // Optionally, add a flag for UI to show "collect contact info" specific UI
   action_collect_contact_info?: boolean;
   requested_contact_field?: string; // If action_collect_contact_info is true
+  lead?: boolean; // Flag to indicate if lead form should be shown
+  intent_id?: string; // Add this field to return the detected intent
 }
 
+// 1. Update detectIntent to accept sessionId
 export async function detectIntent(
   message: string,
   chatbotId: string,
-  history?: Array<{ role: string; content: string }>
+  history?: Array<{ role: string; content: string }>,
+  sessionId?: string
 ): Promise<ChatResponse | null> {
   try {
     // --- LOGGING: Fetch and log chatbot data from backend ---
     const chatbot = await storage.getChatbot(chatbotId);
     if (!chatbot) throw new Error("Chatbot not found");
     const { plainData, trainingData, phone, whatsapp, website, aiProvider, customApiKey, model, aiSystemPrompt } = chatbot;
-    // Dynamically extract intent tags from training data
-    const dynamicIntentTags = extractIntentTags(trainingData);
+    
+    // Handle both old training data format (array) and new question flow format (JSON string)
+    let parsedTrainingData = trainingData;
+    let dynamicIntentTags: string[] = [];
+    
+    if (trainingData) {
+      try {
+        // Try to parse as JSON string (new format - question flow)
+        if (typeof trainingData === 'string') {
+          parsedTrainingData = JSON.parse(trainingData);
+        }
+        
+        // Check if it's the old training data format (array of TrainingDataItem)
+        if (Array.isArray(parsedTrainingData)) {
+          dynamicIntentTags = extractIntentTags(parsedTrainingData);
+        } else {
+          // New format - question flow, use default intents
+          dynamicIntentTags = ['greeting', 'general_inquiry', 'contact_info', 'pricing', 'services'];
+        }
+      } catch (error) {
+        console.error('[detectIntent] Error parsing trainingData:', error);
+        // Fallback to default intents
+        dynamicIntentTags = ['greeting', 'general_inquiry', 'contact_info', 'pricing', 'services'];
+      }
+    } else {
+      // No training data, use default intents
+      dynamicIntentTags = ['greeting', 'general_inquiry', 'contact_info', 'pricing', 'services'];
+    }
 
     // --- Lead collection AI instruction ---
     const leadCollectionInstruction = chatbot.leadCollectionEnabled
@@ -282,7 +313,8 @@ WhatsApp: ${whatsapp || "Not available"}
 Phone: ${phone || "Not available"}
 Website: ${website || "Not available"}
 `;
-    const plainTrainingData = plainData || JSON.stringify(trainingData, null, 2);
+    // Use plainData for training content, fallback to trainingData if needed
+    const plainTrainingData = plainData || (typeof trainingData === 'string' ? trainingData : JSON.stringify(trainingData, null, 2));
 
     // 4. Intent Detection
     let detectedIntentLabel = 'unrecognized_intent';
@@ -317,10 +349,23 @@ Website: ${website || "Not available"}
     
     // 5. Prepare response
     const isRecognizedIntent = dynamicIntentTags.includes(detectedIntentLabel);
-    let relevantTrainingData = getTrainingDataItem(trainingData, detectedIntentLabel);
-  
+    let relevantTrainingData = null;
+    
+    // Try to get relevant training data based on format
+    if (Array.isArray(parsedTrainingData)) {
+      // Old format - array of TrainingDataItem
+      relevantTrainingData = getTrainingDataItem(parsedTrainingData, detectedIntentLabel);
+    } else {
+      // New format - question flow, create a simple response structure
+      relevantTrainingData = {
+        default_response_text: `I understand you're asking about ${detectedIntentLabel.replace('_', ' ')}. Let me help you with that.`,
+        follow_up_options: [],
+        cta_button_text: "Contact Us",
+        cta_button_link: whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g, '')}` : "#"
+      };
+    }
 
-    console.log(relevantTrainingData)
+    console.log('[detectIntent] Relevant training data:', relevantTrainingData);
     let finalMessageText: string;
     let finalFollowUpOptions: FollowUpOption[] = [];
     let finalCtaButton: { text: string; link: string } | undefined;
@@ -360,12 +405,11 @@ Website: ${website || "Not available"}
 ${leadCollectionInstruction}${greetingInstruction}
 
 Based on the user's intent "${detectedIntentLabel}", and the message "${message}", generate a response that is:
-- As relevant and concise as possible.
+- As relevant and concise as possible.try to round up in 1 to 2 sentences.
 - If the answer can be made clearer as a list, use bullet points (use '-' for each point).
 - If there are any important keywords, actions, or values, highlight them using double asterisks (e.g., **important**).
-- Do NOT always use paragraphs; use the most direct and clear format for the answer.
-- If a special action button (CTA) is available, add a short, clear sentence inviting the user to click it, and make it visually distinct (e.g., as a separate line or with highlight).
-- Use the following as a reference for your answer: "${relevantTrainingData.default_response_text}".Do not copy the default response text.Change it to a dynamic and natural response.
+- Try to avoid answering in paragraphs; use the most direct and clear format for the answer.always use line breaks to make it more readable.
+- Use the following as a reference for your answer: "${relevantTrainingData.default_response_text}". Do not copy the default response text. Change it to a dynamic and natural response.
 ${followUpSummary}. do not list the follow up options in your response.
 
 Here is the chatbot's training data for your reference:
@@ -373,7 +417,9 @@ ${plainTrainingData}
 
 ${contactInfo}
 
-Return only the response text, formatted for clarity and relevance as described above.`;
+Return only the response text, formatted for clarity and relevance as described above.
+- If the query is not related to the training data context, respond to it naturally as a normal ai assistant.
+`;
 
       if (aiProvider === 'google' || aiProvider === 'platform') {
         const key = aiProvider === 'google' ? customApiKey : process.env.GEMINI_API_KEY;
@@ -409,6 +455,30 @@ Return only the response text, formatted for clarity and relevance as described 
       finalCtaButton = { text: globalConfig.default_cta_text, link: globalConfig.default_cta_link };
     }
 
+    // --- Determine if lead form should be shown ---
+    let conversationTurns = 0;
+    if (history && Array.isArray(history)) {
+      conversationTurns = history.filter(h => h.role === 'user').length;
+    }
+
+    let shouldShowLead = false;
+    if (chatbot.leadCollectionEnabled) {
+      const highValueIntents = ['contact_info', 'pricing', 'services', 'booking', 'appointment', 'demo'];
+      // Show immediately for high-value intents
+      if (highValueIntents.includes(detectedIntentLabel)) {
+        shouldShowLead = true;
+      }
+      // After 3 user messages, only show if the current intent is high-value, general inquiry, or unrecognized
+      else if (
+        conversationTurns >= 3 &&
+        (highValueIntents.includes(detectedIntentLabel) ||
+         detectedIntentLabel === 'general_inquiry' ||
+         detectedIntentLabel === 'unrecognized_intent')
+      ) {
+        shouldShowLead = true;
+      }
+    }
+
     // --- Format Response for UI ---
     const responseForUI: ChatResponse = {
       message_text: finalMessageText,
@@ -417,8 +487,52 @@ Return only the response text, formatted for clarity and relevance as described 
         payload: option.associated_intent_id || (option.cta_button_link ? { type: "cta_option", link: option.cta_button_link } : "no_action")
       })),
       cta_button: finalCtaButton,
+      lead: shouldShowLead,
+      intent_id: detectedIntentLabel, // Add the detected intent label here
     };
 
+    // --- Chat session and message saving ---
+    // Use provided sessionId or generate a new one
+    
+    const sid = sessionId || uuidv4();
+    // Create session if not exists (ignore error if already exists)
+    try {
+      await storage.createChatSession({
+        id: sid, // Ensure sessionId matches between session and messages
+        chatbotId,
+        userId: chatbot.userId,
+        sessionData: {},
+      });
+    } catch (e) {}
+    // Save user message
+    await storage.createChatMessage({
+      sessionId: sid,
+      chatbotId,
+      userId: chatbot.userId,
+      sender: 'user',
+      content: message,
+      messageType: 'text',
+      metadata: {},
+    });
+
+    // After generating the bot response (responseForUI), save bot message
+    if (responseForUI && responseForUI.message_text) {
+      await storage.createChatMessage({
+        sessionId: sid,
+        chatbotId,
+        userId: chatbot.userId,
+        sender: 'bot',
+        content: responseForUI.message_text,
+        messageType: 'text',
+        metadata: { 
+          intent_id: responseForUI.intent_id,
+          lead: responseForUI.lead, // Save the lead flag in metadata
+          shouldCollectLead: responseForUI.lead // Also save as shouldCollectLead for backward compatibility
+        },
+      });
+    }
+
+    // Return response (sessionId will be returned separately from the route)
     return responseForUI;
 
   } catch (error: any) {
@@ -426,7 +540,9 @@ Return only the response text, formatted for clarity and relevance as described 
     return {
       message_text: "I apologize, but I'm currently experiencing technical difficulties. Please try again later or contact us directly.",
       follow_up_buttons: [],
-      cta_button: { text: globalConfig.default_cta_text, link: globalConfig.default_cta_link }
+      cta_button: { text: globalConfig.default_cta_text, link: globalConfig.default_cta_link },
+      lead: false,
+      intent_id: 'unrecognized_intent',
     };
   }
 }

@@ -79,14 +79,31 @@ export class ChatHistoryManager {
   }
 
   /**
-   * Get chat sessions summary for a chatbot
+   * Get chat sessions summary for a chatbot with filtering
    */
-  static async getChatSessionsSummary(chatbotId: string): Promise<ChatSessionSummary[]> {
+  static async getChatSessionsSummary(
+    chatbotId: string, 
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      leadCollected?: boolean;
+      searchTerm?: string;
+    }
+  ): Promise<ChatSessionSummary[]> {
     try {
       const messages = await storage.getChatMessagesByChatbot(chatbotId, 1000);
       
+      // Apply search filter if provided
+      let filteredMessages = messages;
+      if (filters?.searchTerm) {
+        const searchLower = filters.searchTerm.toLowerCase();
+        filteredMessages = messages.filter(msg => 
+          msg.content.toLowerCase().includes(searchLower)
+        );
+      }
+      
       // Group messages by session
-      const sessionGroups = messages.reduce((groups, message) => {
+      const sessionGroups = filteredMessages.reduce((groups, message) => {
         if (!groups[message.sessionId]) {
           groups[message.sessionId] = [];
         }
@@ -95,7 +112,7 @@ export class ChatHistoryManager {
       }, {} as Record<string, ChatMessage[]>);
       
       // Create session summaries
-      const summaries: ChatSessionSummary[] = Object.entries(sessionGroups).map(([sessionId, sessionMessages]) => {
+      let summaries: ChatSessionSummary[] = Object.entries(sessionGroups).map(([sessionId, sessionMessages]) => {
         const sortedMessages = sessionMessages.sort((a, b) => 
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
@@ -104,11 +121,18 @@ export class ChatHistoryManager {
         const lastMessage = new Date(sortedMessages[sortedMessages.length - 1].createdAt);
         const duration = (lastMessage.getTime() - firstMessage.getTime()) / (1000 * 60); // minutes
         
-        // Check if lead was collected
-        const leadCollected = sessionMessages.some(msg => 
-          msg.metadata && typeof msg.metadata === 'object' && 
-          'shouldCollectLead' in msg.metadata && msg.metadata.shouldCollectLead
-        );
+        // Check if lead was collected - check both new 'lead' field and old 'shouldCollectLead' field
+        const leadCollected = sessionMessages.some(msg => {
+          if (!msg.metadata || typeof msg.metadata !== 'object') return false;
+          
+          // Check for new 'lead' field first
+          if ('lead' in msg.metadata && msg.metadata.lead === true) return true;
+          
+          // Check for old 'shouldCollectLead' field for backward compatibility
+          if ('shouldCollectLead' in msg.metadata && msg.metadata.shouldCollectLead === true) return true;
+          
+          return false;
+        });
         
         // Extract user info from metadata if available
         const userMessage = sessionMessages.find(msg => msg.sender === 'user');
@@ -128,6 +152,26 @@ export class ChatHistoryManager {
           userName
         };
       });
+      
+      // Apply date filters
+      if (filters?.startDate) {
+        summaries = summaries.filter(session => 
+          session.firstMessage >= filters.startDate!
+        );
+      }
+      
+      if (filters?.endDate) {
+        summaries = summaries.filter(session => 
+          session.lastMessage <= filters.endDate!
+        );
+      }
+      
+      // Apply lead collection filter
+      if (filters?.leadCollected !== undefined) {
+        summaries = summaries.filter(session => 
+          session.leadCollected === filters.leadCollected
+        );
+      }
       
       return summaries.sort((a, b) => b.lastMessage.getTime() - a.lastMessage.getTime());
     } catch (error) {

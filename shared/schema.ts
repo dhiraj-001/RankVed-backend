@@ -269,7 +269,6 @@ export const insertLeadSchema = createInsertSchema(leads).omit({
 });
 
 export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({
-  id: true,
   startedAt: true,
 });
 

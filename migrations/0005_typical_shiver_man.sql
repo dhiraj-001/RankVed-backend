@@ -1,0 +1,1 @@
+ALTER TABLE "chatbots" ALTER COLUMN "lead_collection_fields" SET DEFAULT '{"name","phone"}';

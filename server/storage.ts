@@ -53,6 +53,8 @@ export interface IStorage {
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
   updateChatSession(id: string, updates: Partial<InsertChatSession>): Promise<ChatSession>;
   getChatSessionsByUser(userId: number): Promise<ChatSession[]>;
+  deleteChatSession(id: string): Promise<void>;
+  deleteAllChatSessionsByChatbot(chatbotId: string): Promise<void>;
 
   // Usage stats methods
   getUsageStats(userId: number, date: Date): Promise<UsageStats | undefined>;
@@ -67,6 +69,7 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(sessionId: string): Promise<ChatMessage[]>;
   getChatMessagesByChatbot(chatbotId: string, limit?: number): Promise<ChatMessage[]>;
+  deleteChatMessagesBySession(sessionId: string): Promise<void>;
   
   // Data backup and recovery methods
   createDataBackup(backup: InsertDataBackup): Promise<DataBackup>;
@@ -352,6 +355,26 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
+  async deleteChatMessagesBySession(sessionId: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(chatMessages).where(eq(chatMessages.sessionId, sessionId));
+  }
+
+  async deleteChatSession(id: string): Promise<void> {
+    const db = await getDb();
+    await db.delete(chatSessions).where(eq(chatSessions.id, id));
+  }
+
+  async deleteAllChatSessionsByChatbot(chatbotId: string): Promise<void> {
+    const db = await getDb();
+    
+    // First delete all messages for this chatbot
+    await db.delete(chatMessages).where(eq(chatMessages.chatbotId, chatbotId));
+    
+    // Then delete all sessions for this chatbot
+    await db.delete(chatSessions).where(eq(chatSessions.chatbotId, chatbotId));
+  }
+
   // Data backup and recovery methods for critical data protection
   async createDataBackup(insertBackup: InsertDataBackup): Promise<DataBackup> {
     const db = await getDb();
@@ -407,7 +430,11 @@ export class DatabaseStorage implements IStorage {
   // Question template methods
   async createQuestionTemplate(template: InsertQuestionTemplate): Promise<any> {
     const db = await getDb();
-    const [questionTemplate] = await db.insert(questionTemplates).values(template).returning();
+    const [questionTemplate] = await db.insert(questionTemplates).values({
+      ...template,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
     return questionTemplate;
   }
 }

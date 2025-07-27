@@ -43,6 +43,7 @@ Your primary goal is to create a set of chatbot flows that are:
    - FAQ intent
 10. Keep all follow-up button names as short as possible (1-3 words, clear and direct).
 11. **IMPORTANT:** For any main action or external link (such as 'Contact Us', 'View Courses', 'Enroll Now', etc.), ALWAYS use the cta_button_text and cta_button_link fields. Do NOT place these as follow_up_options. Only use follow_up_options for intent navigation or secondary actions that do not involve external links or main CTAs.
+12. **LEAD FIELD REQUIREMENT:** For each TrainingDataItem, include a boolean field 'lead'. Set 'lead: true' for any intent where collecting a lead is relevant (such as contact, pricing, booking, demo, or any intent where the user is likely to provide their contact information or request a callback/quote). Set 'lead: false' for all other intents. This field is required in every TrainingDataItem.
 
 Instructions for generating each TrainingDataItem in the list:
 - **INTENT CREATION STRATEGY:** Derive intent_id from EVERY distinct topic, subtopic, question, and concept in the provided text. Be extremely thorough:
@@ -58,6 +59,7 @@ Instructions for generating each TrainingDataItem in the list:
     - All follow-up button names must be as short as possible (1-3 words).
 - Populate cta_button_text and cta_button_link for the main intent: The primary call to action for this intent's response, often a link to a relevant webpage. Prefer WhatsApp/Call for concluding or escalating points.
 - collect_contact_info (at intent level): Set this to true ONLY for intents like "connect_to_human" where the primary purpose is to collect user contact details immediately.
+- **lead (at intent level):** This boolean field must be present in every TrainingDataItem. Set 'lead: true' for intents where lead collection is relevant (contact, pricing, booking, demo, callback, quote, etc.), and 'lead: false' for all others.
 
 ---
 **CRITICAL REQUIREMENT:** You MUST generate AT LEAST 15-25 TrainingDataItem objects. If the input content is substantial, aim for 20-30 intents. Be extremely thorough and comprehensive in your analysis.
@@ -68,7 +70,6 @@ Example Input (for few-shot learning - use a simpler, connected example):
 Paragraph A: TechCorp Solutions offers a wide range of software services including Web Development, Mobile Apps, and Cloud Solutions. Our project process requires an initial consultation and setup fee of $500.
 Paragraph B: Our Web Development service focuses on modern frameworks, responsive design, and SEO optimization. It's a comprehensive package with pricing starting at $2,000 per project.
 Paragraph C: We offer maintenance packages for ongoing support and have a dedicated customer success team. Contact us at info@techcorp.com or call +1 555-0123.
-
 
 ---
 Input Text (Provide multiple related paragraphs here):

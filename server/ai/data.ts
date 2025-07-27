@@ -219,6 +219,7 @@ export interface TrainingDataItem {
   follow_up_options: FollowUpOption[]; // Optional: direct follow-up options for this data
   cta_button_text?: string;
   cta_button_link?: string;
+  lead?: boolean; // Optional: mark this intent as lead-worthy
   // Add other fields as needed, e.g., entities to extract
 }
 

@@ -427,8 +427,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         domainRestrictionsEnabled: chatbot.domainRestrictionsEnabled,
         questionFlowEnabled: chatbot.questionFlowEnabled,
         questionFlow: chatbot.questionFlow,
-        enableNotificationSound: chatbot.enableNotificationSound,
-        customNotificationSound: chatbot.customNotificationSound
+        popupSoundEnabled: chatbot.popupSoundEnabled,
+        customPopupSound: chatbot.customPopupSound
       });
     } catch (error) {
       res.status(500).json({ message: (error as Error).message });
@@ -1065,6 +1065,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get chat messages for a specific session
+  app.get("/api/chat-sessions/:id/messages", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const messages = await storage.getChatMessages(req.params.id);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete a specific chat session
+  app.delete("/api/chat-sessions/:id", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const sessionId = req.params.id;
+      
+      // First, delete all messages for this session
+      await storage.deleteChatMessagesBySession(sessionId);
+      
+      // Then delete the session
+      await storage.deleteChatSession(sessionId);
+      
+      res.json({ message: 'Chat session deleted successfully' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete all chat sessions for a chatbot
+  app.delete("/api/chatbots/:id/sessions", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const chatbotId = req.params.id;
+      
+      // Verify chatbot ownership
+      const chatbot = await storage.getChatbot(chatbotId);
+      if (!chatbot || chatbot.userId !== req.user.id) {
+        return res.status(404).json({ message: 'Chatbot not found' });
+      }
+      
+      // Delete all sessions and messages for this chatbot
+      await storage.deleteAllChatSessionsByChatbot(chatbotId);
+      
+      res.json({ message: 'All chat sessions deleted successfully' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get sample question flows by business type
   app.get('/api/sample-flows/:businessType', (req, res) => {
     try {
@@ -1219,7 +1266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const origin = req.headers.origin?.toString();
     setCORSHeaders(res, origin);
     try {
-      const { message, history } = req.body;
+      const { message, history, sessionId } = req.body;
       const { chatbotId } = req.params;
       
       if (!message || typeof message !== "string") {
@@ -1246,8 +1293,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const intent = await detectIntent(message, chatbotId, history);
-      res.json({ intent });
+      const intent = await detectIntent(message, chatbotId, history, sessionId);
+      res.json({ intent, sessionId: intent?.sessionId });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to detect intent" });
     }
@@ -1280,7 +1327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get chat sessions summary
+  // Get chat sessions summary with filtering
   app.get('/api/chatbots/:id/sessions', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const chatbot = await storage.getChatbot(req.params.id);
@@ -1288,7 +1335,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Chatbot not found' });
       }
       
-      const sessions = await ChatHistoryManager.getChatSessionsSummary(req.params.id);
+      // Extract filter parameters
+      const { startDate, endDate, leadCollected, q: searchTerm } = req.query;
+      
+      const filters: any = {};
+      if (startDate) filters.startDate = new Date(startDate as string);
+      if (endDate) filters.endDate = new Date(endDate as string);
+      if (leadCollected !== undefined) filters.leadCollected = leadCollected === 'true';
+      if (searchTerm) filters.searchTerm = searchTerm as string;
+      
+      const sessions = await ChatHistoryManager.getChatSessionsSummary(req.params.id, filters);
       res.json(sessions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
