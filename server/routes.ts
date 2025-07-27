@@ -319,13 +319,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const chatbotData = insertChatbotSchema.parse({
         ...req.body,
         userId: req.user.id,
-        aiProvider: req.body.aiProvider ?? "google", // Always default to Gemini
+        aiProvider: req.body.aiProvider ?? "platform", // Always default to Gemini
         customApiKey: req.body.customApiKey ?? process.env.GEMINI_API_KEY, // Always default to Gemini key
       });
       const chatbot = await storage.createChatbot(chatbotData);
       res.json(chatbot);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: (error as Error).message });
     }
   });
 
@@ -373,6 +373,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get lead collection fields for a chatbot
+  app.get("/api/chatbots/:id/lead-fields", async (req, res) => {
+    try {
+      const chatbot = await storage.getChatbot(req.params.id);
+      if (!chatbot || !chatbot.isActive) {
+        return res.status(404).json({ message: "Chatbot not found or inactive" });
+      }
+      
+      res.json({
+        leadCollectionEnabled: chatbot.leadCollectionEnabled,
+        leadCollectionFields: chatbot.leadCollectionFields || ['name', 'phone'],
+        chatbotId: chatbot.id
+      });
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message });
+    }
+  });
+
   // Public endpoint for embed widget configuration
   app.get("/api/chatbots/:id/public", async (req, res) => {
     res.header("Access-Control-Allow-Origin", "*");
@@ -400,8 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         suggestionPersistence: chatbot.suggestionPersistence,
         suggestionTimeout: chatbot.suggestionTimeout,
         leadCollectionEnabled: chatbot.leadCollectionEnabled,
-        leadCollectionAfterMessages: chatbot.leadCollectionAfterMessages,
-        leadCollectionMessage: chatbot.leadCollectionMessage,
+        leadCollectionFields: chatbot.leadCollectionFields,
         chatWindowTheme: chatbot.chatWindowTheme,
         chatWindowStyle: chatbot.chatWindowStyle,
         borderRadius: chatbot.borderRadius,
@@ -903,12 +920,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Accept both chatbotId from URL and body for compatibility
       const chatbotId = req.body.chatbotId || req.params.chatbotId;
-      const { name, email, phone, consentGiven, source = 'chat_widget', conversationContext } = req.body;
-      // Get chatbot to find the owner
+      const { name, email, phone, consentGiven, source = 'chat_widget', conversationContext, ...additionalFields } = req.body;
+      
+      // Get chatbot to find the owner and required fields
       const chatbot = await storage.getChatbot(chatbotId);
       if (!chatbot || !chatbot.isActive) {
         return res.status(404).json({ message: "Chatbot not found or inactive" });
       }
+
+      // Validate required fields based on chatbot configuration
+      const requiredFields = chatbot.leadCollectionFields || ['name', 'phone'];
+      const missingFields = requiredFields.filter(field => {
+        const value = req.body[field];
+        return !value || (typeof value === 'string' && value.trim() === '');
+      });
+
+      if (missingFields.length > 0) {
+        return res.status(400).json({ 
+          message: "Missing required fields", 
+          missingFields,
+          requiredFields 
+        });
+      }
+
       // Domain security validation
       const origin = req.headers.origin || req.headers.referer;
       if (process.env.MODE !== 'development') {
@@ -924,6 +958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
+
       // Create lead with chatbot owner's userId and store consent/context
       const leadData = {
         chatbotId,
@@ -934,9 +969,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         consentGiven: !!consentGiven,
         source,
         status: 'new' as const,
-        conversationContext: conversationContext || null
+        conversationContext: conversationContext || null,
+        // Include any additional fields that were submitted
+        ...additionalFields
       };
+      
       const lead = await storage.createLead(leadData);
+      
       // Send webhook if configured
       if (chatbot.leadsWebhookUrl) {
         try {
@@ -949,7 +988,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Webhook error:", webhookError);
         }
       }
-      res.json({ message: "Lead collected successfully", leadId: lead.id });
+      
+      res.json({ 
+        message: "Lead collected successfully", 
+        leadId: lead.id,
+        requiredFields: chatbot.leadCollectionFields 
+      });
     } catch (error) {
       console.error("Lead collection error:", error);
       res.status(400).json({ message: "Failed to collect lead" });

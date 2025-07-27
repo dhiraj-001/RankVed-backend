@@ -102,8 +102,7 @@ export const chatbots = pgTable("chatbots", {
 
   // Lead Collection
   leadCollectionEnabled: boolean("lead_collection_enabled").default(true),
-  leadCollectionAfterMessages: integer("lead_collection_after_messages").default(3),
-  leadCollectionMessage: text("lead_collection_message").default("To help you better, may I have your name and contact information?"),
+  leadCollectionFields: text("lead_collection_fields").array().default(["name", "phone"]), // Array of required fields to collect
   
   // Modern Appearance
   chatWindowStyle: text("chat_window_style").default("modern"), // modern, classic, minimal, floating

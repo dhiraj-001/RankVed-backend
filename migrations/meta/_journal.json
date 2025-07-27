@@ -22,6 +22,20 @@
       "when": 1753559362996,
       "tag": "0002_bizarre_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1753599624031,
+      "tag": "0003_eminent_onslaught",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1753599912519,
+      "tag": "0004_panoramic_havok",
+      "breakpoints": true
     }
   ]
 }
