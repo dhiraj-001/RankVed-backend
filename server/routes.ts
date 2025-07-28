@@ -1000,6 +1000,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sound management routes
+  app.get("/api/sounds/custom", authenticateUser, async (req: any, res: any) => {
+    try {
+      if (!req.user?.id) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const customSounds = await storage.getCustomSounds(req.user.id);
+      res.json(customSounds);
+    } catch (error: any) {
+      console.error("Error fetching custom sounds:", error);
+      res.status(500).json({ message: "Failed to fetch custom sounds" });
+    }
+  });
+
   // Training data routes
   app.post("/api/training/process", authenticateUser, async (req, res) => {
     try {

@@ -24,7 +24,7 @@ import {
   type InsertQuestionTemplate
 } from "@shared/schema";
 import { getDb } from "./db";
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql, isNotNull, ne } from "drizzle-orm";
 import { createHash } from "crypto";
 
 export interface IStorage {
@@ -78,6 +78,9 @@ export interface IStorage {
 
   // Question template methods
   createQuestionTemplate(template: InsertQuestionTemplate): Promise<any>;
+
+  // Sound management methods
+  getCustomSounds(userId: number): Promise<Array<{ id: string; name: string; soundUrl: string; createdAt: Date }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -436,6 +439,34 @@ export class DatabaseStorage implements IStorage {
       updatedAt: new Date(),
     }).returning();
     return questionTemplate;
+  }
+
+  // Sound management methods
+  async getCustomSounds(userId: number): Promise<Array<{ id: string; name: string; soundUrl: string; createdAt: Date }>> {
+    const db = await getDb();
+    const chatbotsWithSounds = await db.select({
+      id: chatbots.id,
+      name: chatbots.name,
+      soundUrl: chatbots.customPopupSound,
+      createdAt: chatbots.createdAt,
+    })
+    .from(chatbots)
+    .where(
+      and(
+        eq(chatbots.userId, userId),
+        isNotNull(chatbots.customPopupSound),
+        ne(chatbots.customPopupSound, '')
+      )
+    );
+
+    return chatbotsWithSounds
+      .filter(chatbot => chatbot.soundUrl && chatbot.soundUrl !== '/openclose.mp3')
+      .map(chatbot => ({
+        id: chatbot.id,
+        name: chatbot.name,
+        soundUrl: chatbot.soundUrl!,
+        createdAt: chatbot.createdAt
+      }));
   }
 }
 
