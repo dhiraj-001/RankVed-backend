@@ -3,8 +3,7 @@ import { createServer, type Server } from "http";
 import path from "path";
 import { storage } from "./storage";
 import { insertUserSchema, insertChatbotSchema, insertLeadSchema } from "@shared/schema";
-import { generateGeminiResponse, generateChatResponse, processTrainingData, fetchWebsiteContent, detectIntent } from "./ai/openai";
-import { generatePersonalizedRecommendations } from "./ai/onboarding";
+import {  processTrainingData, fetchWebsiteContent, detectIntent } from "./ai/openai";
 import { getDefaultQuestionFlow } from "./sample-flows";
 import type { AuthenticatedRequest } from "./types";
 import { fileURLToPath } from 'url';
@@ -12,6 +11,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { generateFlowControlledTrainingData } from "./ai/training";
 import { PopupSoundManager } from './sound-management';
 import { ChatHistoryManager } from './chat-history-manager';
+import { eq, sql } from "drizzle-orm";
+import { getDb } from "./db";
+import { chatbots, chatSessions, chatMessages } from "@shared/schema";
 
 // Intent detection function to connect AI with question flow
 function detectIntentAndTriggerFlow(message: string, flowNodes: any[]): any | null {
@@ -500,344 +502,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Chat routes
-  app.post("/api/chat/:chatbotId/message", async (req, res) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
-    
-    const requestId = uuidv4();
-    const startTime = Date.now();
-    
-    console.log(`[${requestId}] 🚀 Chat message request started:`, {
-      chatbotId: req.params.chatbotId,
-      messageLength: req.body.message?.length || 0,
-      hasContext: !!req.body.context,
-      timestamp: new Date().toISOString()
-    });
-    
-    try {
-      const { message, context } = req.body;
-      const chatbot = await storage.getChatbot(req.params.chatbotId);
-      
-      if (!chatbot || !chatbot.isActive) {
-        console.log(`[${requestId}] ❌ Chatbot not found or inactive:`, req.params.chatbotId);
-        return res.status(404).json({ message: "Chatbot not found or inactive" });
-      }
-
-      console.log(`[${requestId}] ✅ Chatbot found:`, {
-        chatbotId: chatbot.id,
-        chatbotName: chatbot.name,
-        aiProvider: chatbot.aiProvider,
-        questionFlowEnabled: chatbot.questionFlowEnabled
-      });
-
-      // Domain validation removed for iframe serving
-
-      // Track message count for lead collection
-      const sessionId = (req.headers['x-session-id'] as string) || uuidv4();
-      const messageCount = context?.messageCount || 0;
-      const manualMessageCount = context?.manualMessageCount || 0;
-
-      console.log(`[${requestId}] 📊 Message tracking:`, {
-        sessionId,
-        messageCount,
-        manualMessageCount,
-        hasContext: !!context
-      });
-
-      // Create or update chat session
-      let session;
-      try {
-        session = await storage.createChatSession({
-          id: sessionId,
-          chatbotId: chatbot.id,
-          userId: chatbot.userId,
-          sessionData: { messageCount, context }
-        });
-        console.log(`[${requestId}] ✅ Chat session created/updated:`, sessionId);
-      } catch (error) {
-        // Session might already exist, which is fine
-        console.log(`[${requestId}] ℹ️ Session creation note:`, error.message);
-      }
-
-      // Store user message with persistent backup
-      await storage.createChatMessage({
-        sessionId: sessionId,
-        chatbotId: chatbot.id,
-        userId: chatbot.userId,
-        content: message,
-        sender: 'user',
-        messageType: 'text',
-        metadata: { context, messageCount }
-      });
-      
-      console.log(`[${requestId}] ✅ User message stored:`, {
-        sessionId,
-        messageLength: message.length
-      });
-      
-      // Check if lead collection should be triggered (only for manual chats, not flow-based)
-      const isManualChat = !context?.isFlowBased && !context?.usingSuggestions;
-      const shouldCollectLead = chatbot.leadCollectionEnabled && 
-                               isManualChat &&
-                               manualMessageCount >= (chatbot.leadCollectionAfterMessages || 3) &&
-                               !context?.leadCollected &&
-                               manualMessageCount % (chatbot.leadCollectionAfterMessages || 3) === 0;
-
-      console.log(`[${requestId}] 🔍 Lead collection check:`, {
-        isManualChat,
-        shouldCollectLead,
-        leadCollectionEnabled: chatbot.leadCollectionEnabled,
-        leadCollectionAfterMessages: chatbot.leadCollectionAfterMessages,
-        leadCollected: context?.leadCollected
-      });
-
-      // Check for intent-based question flow triggers
-      let intentTriggeredNode = null;
-      if (chatbot.questionFlowEnabled && chatbot.questionFlow && Array.isArray(chatbot.questionFlow.nodes)) {
-        console.log(`[${requestId}] [Intent Detection] Analyzing message: "${message}" for chatbot ${chatbot.id}`);
-        intentTriggeredNode = detectIntentAndTriggerFlow(message, chatbot.questionFlow.nodes);
-        if (intentTriggeredNode) {
-          console.log(`[${requestId}] [Intent Detection] ✅ Triggered node:`, {
-            nodeId: intentTriggeredNode.id,
-            nodeType: intentTriggeredNode.type,
-            nodeQuestion: intentTriggeredNode.question || intentTriggeredNode.text,
-            chatbotId: chatbot.id,
-            message: message
-          });
-        } else {
-          console.log(`[${requestId}] [Intent Detection] ❌ No intent match found for message: "${message}"`);
-        }
-      } else {
-        console.log(`[${requestId}] [Intent Detection] ⚠️ Question flow not enabled or invalid for chatbot ${chatbot.id}`);
-      }
-
-      // Log questionFlow for debugging
-      // console.log('[Route] chatbot.questionFlow:', chatbot.questionFlow);
-
-      let response: string;
-      let responseType = 'text';
-      let triggeredFlowNode = null;
-      
-      // Check for flow nodes first, then generate AI response with flow context
-      let flowContext = null;
-      if (intentTriggeredNode) {
-        console.log(`[${requestId}] [Flow Execution] 🚀 Flow node detected:`, {
-          nodeId: intentTriggeredNode.id,
-          nodeType: intentTriggeredNode.type,
-          chatbotId: chatbot.id
-        });
-        
-        flowContext = { triggeredNode: intentTriggeredNode, flowNodes: chatbot.questionFlow?.nodes };
-        triggeredFlowNode = intentTriggeredNode;
-        responseType = intentTriggeredNode.type === 'contact-form' ? 'form' : 'text';
-        
-        console.log(`[${requestId}] [Flow Execution] 📝 AI will be informed about flow node execution`);
-      }
-      
-      // Generate AI response with flow context if available
-      console.log(`[${requestId}] [AI Generation] 🤖 Generating AI response for user message`);
-      
-      if (chatbot.aiProvider === "google") {
-        console.log(`[${requestId}] [Gemini] Using custom API key:`, !!chatbot.customApiKey);
-        // Use Gemini with training data and system prompt
-        const geminiPrompt = `${chatbot.aiSystemPrompt || "You are a helpful assistant."}\n\n${chatbot.trainingData || ""}\n\nUser: ${message}`;
-        console.log(`[${requestId}] [Gemini] Prompt sent for chatbot`, chatbot.id, ':', geminiPrompt);
-        console.log(`[${requestId}] [Gemini] AI Provider:`, chatbot.aiProvider);
-        
-        if (flowContext) {
-          console.log(`[${requestId}] [AI Integration] 🔗 Passing flow context to Gemini:`, {
-            triggeredNodeId: intentTriggeredNode.id,
-            triggeredNodeType: intentTriggeredNode.type,
-            flowNodesCount: chatbot.questionFlow?.nodes?.length || 0
-          });
-        }
-        
-        try {
-          response = await generateGeminiResponse(
-            geminiPrompt,
-            chatbot.customApiKey,
-            chatbot.model || "gemini-2.5-flash",
-            flowContext
-          );
-          console.log(`[${requestId}] [Gemini] ✅ Response generated successfully:`, {
-            responseLength: response.length,
-            responsePreview: response.substring(0, 100) + '...'
-          });
-        } catch (geminiError: any) {
-          console.error(`[${requestId}] [Gemini] API Error:`, geminiError);
-          if (geminiError.message && geminiError.message.includes('API key not valid')) {
-            response = "I'm sorry, there's an issue with the AI service configuration. Please check your API key settings.";
-          } else {
-            response = "I'm sorry, I'm having trouble connecting to the AI service right now. Please try again later.";
-          }
-        }
-      } else if (chatbot.aiProvider === "platform") {
-        // Platform provider - use Gemini with environment API key
-        console.log(`[${requestId}] [Platform] Using platform provider with Gemini for chatbot`, chatbot.id);
-        const geminiPrompt = `${chatbot.aiSystemPrompt || "You are a helpful assistant."}\n\n${chatbot.trainingData || ""}\n\nUser: ${message}`;
-        console.log(`[${requestId}] [Platform] Prompt sent for chatbot`, chatbot.id, ':', geminiPrompt);
-        
-        if (flowContext) {
-          console.log(`[${requestId}] [AI Integration] 🔗 Passing flow context to Platform Gemini:`, {
-            triggeredNodeId: intentTriggeredNode.id,
-            triggeredNodeType: intentTriggeredNode.type,
-            flowNodesCount: chatbot.questionFlow?.nodes?.length || 0
-          });
-        }
-        
-        try {
-          response = await generateGeminiResponse(
-            geminiPrompt,
-            process.env.GEMINI_API_KEY, // Use environment variable for platform
-            chatbot.model || "gemini-2.5-flash",
-            flowContext
-          );
-          console.log(`[${requestId}] [Platform] ✅ Response generated successfully:`, {
-            responseLength: response.length,
-            responsePreview: response.substring(0, 100) + '...'
-          });
-        } catch (geminiError: any) {
-          console.error(`[${requestId}] [Platform] Gemini API Error:`, geminiError);
-          if (geminiError.message && geminiError.message.includes('API key not valid')) {
-            response = "I'm sorry, there's an issue with the AI service configuration. Please check your platform API key settings.";
-          } else {
-            response = "I'm sorry, I'm having trouble connecting to the AI service right now. Please try again later.";
-          }
-        }
-      } else {
-        // Default to OpenAI
-        if (flowContext) {
-          console.log(`[${requestId}] [AI Integration] 🔗 Passing flow context to OpenAI:`, {
-            triggeredNodeId: intentTriggeredNode.id,
-            triggeredNodeType: intentTriggeredNode.type,
-            flowNodesCount: chatbot.questionFlow?.nodes?.length || 0
-          });
-        }
-        
-        response = await generateChatResponse(
-          message,
-          chatbot.aiSystemPrompt || "You are a helpful assistant.",
-          chatbot.trainingData || undefined,
-          chatbot.customApiKey,
-          flowContext
-        );
-        console.log(`[${requestId}] [OpenAI] ✅ Response generated successfully:`, {
-          responseLength: response.length,
-          responsePreview: response.substring(0, 100) + '...'
-        });
-      }
-      
-      // Check if AI response should trigger additional flow nodes (only if no user-triggered node)
-      let aiTriggeredNode = null;
-      if (!intentTriggeredNode && chatbot.questionFlowEnabled && chatbot.questionFlow && Array.isArray(chatbot.questionFlow.nodes)) {
-        console.log(`[${requestId}] [AI Intent Detection] 🔍 Analyzing AI response: "${response}" for additional flow nodes`);
-        aiTriggeredNode = detectIntentAndTriggerFlow(response, chatbot.questionFlow.nodes);
-        
-        if (aiTriggeredNode) {
-          console.log(`[${requestId}] [AI Intent Detection] ✅ AI response triggered node:`, {
-            nodeId: aiTriggeredNode.id,
-            nodeType: aiTriggeredNode.type,
-            nodeQuestion: aiTriggeredNode.question || aiTriggeredNode.text,
-            chatbotId: chatbot.id,
-            aiResponse: response.substring(0, 100) + '...'
-          });
-          
-          // Set AI-triggered node as the main triggered node
-          triggeredFlowNode = aiTriggeredNode;
-          responseType = aiTriggeredNode.type === 'contact-form' ? 'form' : 'text';
-          
-          // Update flow context
-          if (flowContext) {
-            flowContext.aiTriggeredNode = aiTriggeredNode;
-          } else {
-            flowContext = { aiTriggeredNode, flowNodes: chatbot.questionFlow?.nodes };
-          }
-        } else {
-          console.log(`[${requestId}] [AI Intent Detection] ❌ No flow nodes triggered by AI response`);
-        }
-      } else if (intentTriggeredNode) {
-        console.log(`[${requestId}] [AI Intent Detection] ⏭️ Skipping AI intent detection - user already triggered node:`, intentTriggeredNode.id);
-      }
-      
-      if (shouldCollectLead) {
-        console.log(`[${requestId}] 📝 Lead collection triggered - overriding response`);
-        response = chatbot.leadCollectionMessage || "To help you better, may I have your name and contact information?";
-        responseType = 'form';
-      }
-
-      // Store bot response with persistent backup
-      await storage.createChatMessage({
-        sessionId: sessionId,
-        chatbotId: chatbot.id,
-        userId: chatbot.userId,
-        content: response,
-        sender: 'bot',
-        messageType: responseType,
-        metadata: { shouldCollectLead, messageCount, responseTime: Date.now() }
-      });
-
-      console.log(`[${requestId}] ✅ Bot response stored:`, {
-        sessionId,
-        responseLength: response.length,
-        responseType,
-        shouldCollectLead
-      });
-
-      // Update usage stats
-      try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        await storage.updateUsageStats(chatbot.userId, chatbot.id, today, {
-          apiCallCount: 1,
-          conversationCount: messageCount === 1 ? 1 : 0
-        });
-        console.log(`[${requestId}] ✅ Usage stats updated`);
-      } catch (statsError) {
-        console.error(`[${requestId}] ❌ Failed to update usage stats:`, statsError);
-      }
-
-      const responseData = { 
-        message: response,
-        type: responseType,
-        shouldCollectLead,
-        messageCount,
-        triggeredFlowNode,
-        aiTriggeredNode, // Include AI-triggered node info
-        context: {
-          ...context,
-          messageCount,
-          shouldCollectLead,
-          triggeredFlowNode,
-          aiTriggeredNode
-        }
-      };
-      
-      const responseTime = Date.now() - startTime;
-      console.log(`[${requestId}] 📤 Sending response:`, {
-        chatbotId: chatbot.id,
-        responseType: responseType,
-        hasTriggeredFlowNode: !!triggeredFlowNode,
-        triggeredNodeId: triggeredFlowNode?.id,
-        hasAiTriggeredNode: !!aiTriggeredNode,
-        aiTriggeredNodeId: aiTriggeredNode?.id,
-        messageLength: response.length,
-        shouldCollectLead,
-        responseTime: `${responseTime}ms`
-      });
-      
-      res.json(responseData);
-    } catch (error) {
-      const responseTime = Date.now() - startTime;
-      console.error(`[${requestId}] ❌ Chat message error:`, {
-        error: error.message,
-        responseTime: `${responseTime}ms`,
-        chatbotId: req.params.chatbotId
-      });
-      res.status(500).json({ message: error.message });
-    }
-  });
+  // DEPRECATED: Old chat routes - replaced by /api/chat with detectIntent
+  // app.post("/api/chat/:chatbotId/message", async (req, res) => {
+  //   // ... entire old chat route implementation commented out
+  //   // This route has been replaced by the new /api/chat endpoint that uses detectIntent
+  // });
 
   // Lead routes
   app.get("/api/leads", authenticateUser, async (req, res) => {
@@ -917,6 +586,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+    
+    console.log('[Lead Collection] Request received:', {
+      chatbotId: req.params.chatbotId,
+      body: req.body,
+      headers: {
+        origin: req.headers.origin,
+        referer: req.headers.referer
+      }
+    });
+    
     try {
       // Accept both chatbotId from URL and body for compatibility
       const chatbotId = req.body.chatbotId || req.params.chatbotId;
@@ -930,12 +609,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validate required fields based on chatbot configuration
       const requiredFields = chatbot.leadCollectionFields || ['name', 'phone'];
+      console.log('[Lead Collection] Validation:', {
+        requiredFields,
+        submittedFields: Object.keys(req.body),
+        chatbotLeadFields: chatbot.leadCollectionFields
+      });
+      
       const missingFields = requiredFields.filter(field => {
         const value = req.body[field];
-        return !value || (typeof value === 'string' && value.trim() === '');
+        const isEmpty = !value || (typeof value === 'string' && value.trim() === '');
+        console.log(`[Lead Collection] Field ${field}:`, { value, isEmpty });
+        return isEmpty;
       });
 
       if (missingFields.length > 0) {
+        console.log('[Lead Collection] Missing fields:', missingFields);
         return res.status(400).json({ 
           message: "Missing required fields", 
           missingFields,
@@ -974,7 +662,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...additionalFields
       };
       
-      const lead = await storage.createLead(leadData);
+      let lead;
+      try {
+        lead = await storage.createLead(leadData);
+        console.log('[Lead Collection] Lead created successfully:', lead.id);
+      } catch (dbError) {
+        console.error('[Lead Collection] Database error:', dbError);
+        // If database is down, still return success but log the error
+        lead = { id: 'temp-' + Date.now(), ...leadData };
+        console.log('[Lead Collection] Using temporary lead ID due to database error');
+      }
       
       // Send webhook if configured
       if (chatbot.leadsWebhookUrl) {
@@ -996,7 +693,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Lead collection error:", error);
-      res.status(400).json({ message: "Failed to collect lead" });
+      console.error("Lead collection request body:", req.body);
+      console.error("Lead collection chatbotId:", req.params.chatbotId);
+      res.status(400).json({ 
+        message: "Failed to collect lead",
+        error: error instanceof Error ? error.message : 'Unknown error',
+        details: error instanceof Error ? error.stack : undefined
+      });
+    }
+  });
+
+  // Health check endpoint
+  app.get("/api/health", async (req, res) => {
+    try {
+      const db = await getDb();
+      await db.execute(sql`SELECT 1`);
+      res.json({ 
+        status: 'healthy', 
+        database: 'connected',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('[Health Check] Error:', error);
+      res.status(500).json({ 
+        status: 'unhealthy', 
+        database: 'disconnected',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
     }
   });
 
@@ -1267,7 +991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.header("Access-Control-Allow-Origin", allowOrigin);
     res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
+    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Domain,X-Referer,X-Chatbot-ID");
     res.header("Vary", "Origin"); // Important for caching with multiple origins
   }
   
@@ -1480,6 +1204,336 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
     res.status(500).json({ success: false, message: 'Internal server error' });
     }
   });
+
+  // Chatbot configuration API endpoint for external chatbot
+  app.options("/api/chatbot/:chatbotId/config", (req, res) => {
+    const origin = req.headers.origin?.toString();
+    setCORSHeaders(res, origin);
+    res.status(200).end();
+  });
+  
+  app.get("/api/chatbot/:chatbotId/config", async (req: Request, res: Response) => {
+    const origin = req.headers.origin?.toString();
+    setCORSHeaders(res, origin);
+    
+    try {
+      const { chatbotId } = req.params;
+      const domain = req.headers['x-domain'];
+      const referer = req.headers['x-referer'];
+
+      // Get chatbot from database
+      const db = await getDb();
+      const chatbot = await db.select()
+        .from(chatbots)
+        .where(eq(chatbots.id, chatbotId))
+        .limit(1);
+
+      if (chatbot.length === 0) {
+        return res.status(404).json({ 
+          error: 'Chatbot not found' 
+        });
+      }
+
+      const chatbotData = chatbot[0];
+
+      // Check if chatbot is active
+      if (!chatbotData.isActive) {
+        return res.status(403).json({ 
+          error: 'Chatbot is not active' 
+        });
+      }
+
+      // Domain validation - check if domain is allowed
+      if (chatbotData.allowedDomains && chatbotData.allowedDomains.length > 0) {
+        try {
+          const allowedDomains = chatbotData.allowedDomains;
+          if (Array.isArray(allowedDomains) && allowedDomains.length > 0) {
+            const currentDomain = domain || '';
+            const isAllowed = allowedDomains.some(allowedDomain => 
+              currentDomain.includes(allowedDomain) || 
+              allowedDomain.includes(currentDomain)
+            );
+            
+            if (!isAllowed) {
+              console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
+              return res.status(403).json({ 
+                error: 'Domain not authorized for this chatbot' 
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error checking allowed domains:', error instanceof Error ? error.message : 'Unknown error');
+        }
+      }
+
+      // Return configuration for external chatbot
+      const config = {
+        // Basic info
+        id: chatbotData.id,
+        name: chatbotData.name,
+        
+        // Appearance
+        primaryColor: chatbotData.primaryColor || '#6366F1',
+        secondaryColor: chatbotData.secondaryColor || '#797cf6d4',
+        chatWindowAvatar: chatbotData.chatWindowAvatar,
+        chatBubbleIcon: chatbotData.chatBubbleIcon,
+        chatWidgetIcon: chatbotData.chatWidgetIcon,
+        chatWidgetName: chatbotData.chatWidgetName || 'Support Chat',
+        
+        // Messaging
+        welcomeMessage: chatbotData.welcomeMessage || '',
+        inputPlaceholder: chatbotData.inputPlaceholder || 'Type your message...',
+        initialMessageDelay: chatbotData.initialMessageDelay || 1000,
+        
+        // Sound settings
+        popupSoundEnabled: chatbotData.popupSoundEnabled !== false,
+        customPopupSound: chatbotData.customPopupSound,
+        popupSoundVolume: chatbotData.popupSoundVolume || 50,
+        
+        // Timing & Delays
+        popupDelay: chatbotData.popupDelay || 2000,
+        replyDelay: chatbotData.replyDelay || 1000,
+        
+        // Placement
+        bubblePosition: chatbotData.bubblePosition || 'bottom-right',
+        horizontalOffset: chatbotData.horizontalOffset || 20,
+        verticalOffset: chatbotData.verticalOffset || 20,
+        
+        // Appearance settings
+        title: chatbotData.title || 'Chat with us',
+        showWelcomePopup: chatbotData.showWelcomePopup !== false,
+        suggestionButtons: chatbotData.suggestionButtons ? JSON.parse(chatbotData.suggestionButtons) : [],
+        leadButtonText: chatbotData.leadButtonText || 'Get Started',
+        
+        // Lead collection
+        leadCollectionEnabled: chatbotData.leadCollectionEnabled !== false,
+        leadCollectionFields: chatbotData.leadCollectionFields || ['name', 'phone'],
+        
+        // Contact info
+        whatsapp: chatbotData.whatsapp || '',
+        email: chatbotData.email || '',
+        phone: chatbotData.phone || '',
+        website: chatbotData.website || '',
+        
+        // Branding
+        poweredByText: chatbotData.poweredByText || 'Powered by RankVed',
+        poweredByLink: chatbotData.poweredByLink || '#',
+        
+        // Modern appearance
+        chatWindowStyle: chatbotData.chatWindowStyle || 'modern',
+        chatWindowTheme: chatbotData.chatWindowTheme || 'light',
+        borderRadius: chatbotData.borderRadius || 16,
+        shadowStyle: chatbotData.shadowStyle || 'soft',
+        
+        // Status
+        isActive: chatbotData.isActive
+      };
+
+      res.json(config);
+
+    } catch (error) {
+      console.error('Chatbot config API error:', error);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Chatbot embed API endpoint
+app.post("/api/chat", async (req: Request, res: Response) => {
+    try {
+      const { message, sessionId, chatbotId } = req.body;
+      const domain = req.headers['x-domain'];
+      const referer = req.headers['x-referer'];
+      const chatbotIdHeader = req.headers['x-chatbot-id'];
+
+      // Validate required fields
+      if (!message || !sessionId || !chatbotId) {
+        return res.status(400).json({ 
+          error: 'Missing required fields: message, sessionId, chatbotId' 
+        });
+      }
+
+      // Validate chatbot ID consistency
+      if (chatbotId !== chatbotIdHeader) {
+        return res.status(400).json({ 
+          error: 'Chatbot ID mismatch' 
+        });
+      }
+
+      // Get chatbot from database
+      const db = await getDb();
+      const chatbot = await db.select()
+        .from(chatbots)
+        .where(eq(chatbots.id, chatbotId))
+        .limit(1);
+
+      if (chatbot.length === 0) {
+        return res.status(404).json({ 
+          error: 'Chatbot not found' 
+        });
+      }
+
+      const chatbotData = chatbot[0];
+
+      // Domain validation - check if domain is allowed
+      if (chatbotData.allowedDomains && typeof chatbotData.allowedDomains === 'string' && chatbotData.allowedDomains.trim() !== '') {
+        try {
+          const allowedDomains = JSON.parse(chatbotData.allowedDomains);
+          if (Array.isArray(allowedDomains) && allowedDomains.length > 0) {
+            const currentDomain = domain || '';
+            const isAllowed = allowedDomains.some(allowedDomain => 
+              currentDomain.includes(allowedDomain) || 
+              allowedDomain.includes(currentDomain)
+            );
+            
+            if (!isAllowed) {
+              console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
+              return res.status(403).json({ 
+                error: 'Domain not authorized for this chatbot' 
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing allowed domains:', error instanceof Error ? error.message : 'Unknown error');
+          // Continue without domain validation if parsing fails
+        }
+      }
+
+      // Referer validation (additional security layer)
+      if (referer && domain && typeof referer === 'string') {
+        try {
+          const refererDomain = new URL(referer).hostname;
+          const currentDomain = domain;
+          
+          if (refererDomain !== currentDomain) {
+            console.warn(`Referer mismatch: ${refererDomain} vs ${currentDomain}`);
+            // You can choose to block or just log this
+          }
+        } catch (error) {
+          console.warn('Invalid referer URL:', referer);
+        }
+      }
+
+      // Process the message using AI with detectIntent
+      let aiResult = {
+        response: '',
+        followUpButtons: [],
+        ctaButton: null,
+        shouldShowLead: false,
+        intentId: 'unrecognized_intent'
+      };
+      
+      try {
+        // Use the detectIntent function for enhanced AI processing
+        aiResult = await processMessageWithAI(message, chatbotData, sessionId);
+      } catch (error) {
+        console.error('AI processing error:', error);
+        aiResult.response = 'I apologize, but I\'m having trouble processing your request right now. Please try again later.';
+      }
+
+      // Get userId with fallback to default user (ID: 1)
+      const userId = chatbotData.userId || 1;
+
+      // Save chat session to database
+      try {
+        await db.insert(chatSessions).values({
+          id: sessionId,
+          chatbotId: chatbotId,
+          userId: userId, // Use userId with fallback
+          startedAt: new Date()
+        });
+      } catch (error) {
+        // Log but don't fail the request
+        console.error('Error saving chat session:', error instanceof Error ? error.message : 'Unknown error');
+      }
+
+      // Save message to database
+      try {
+        await db.insert(chatMessages).values({
+          sessionId: sessionId,
+          chatbotId: chatbotId,
+          userId: userId, // Use userId with fallback
+          content: message, // Use 'content' instead of 'message'
+          sender: 'user', // Add the required sender field
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        // Also save the bot response
+        await db.insert(chatMessages).values({
+          sessionId: sessionId,
+          chatbotId: chatbotId,
+          userId: userId, // Use userId with fallback
+          content: aiResult.response, // Use 'content' instead of 'response'
+          sender: 'bot', // Add the required sender field
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      } catch (error) {
+        // Log but don't fail the request
+        console.error('Error saving chat message:', error instanceof Error ? error.message : 'Unknown error');
+      }
+
+      res.json({
+        response: aiResult.response,
+        followUpButtons: aiResult.followUpButtons,
+        ctaButton: aiResult.ctaButton,
+        shouldShowLead: aiResult.shouldShowLead,
+        intentId: aiResult.intentId,
+        sessionId: sessionId,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Chat API error:', error);
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Helper function to process message with AI using detectIntent
+  async function processMessageWithAI(message: string, chatbot: any, sessionId: string) {
+    try {
+      // Use the detectIntent function which handles all AI providers and intent detection
+      const chatResponse = await detectIntent(
+        message,
+        chatbot.id,
+        [], // Empty history for now - could be enhanced to pass conversation history
+        sessionId
+      );
+
+      if (!chatResponse) {
+        return { 
+          response: 'I apologize, but I\'m having trouble processing your request right now. Please try again later.',
+          followUpButtons: [],
+          ctaButton: null,
+          shouldShowLead: false,
+          intentId: 'unrecognized_intent'
+        };
+      }
+
+      return {
+        response: chatResponse.message_text,
+        followUpButtons: chatResponse.follow_up_buttons || [],
+        ctaButton: chatResponse.cta_button || null,
+        shouldShowLead: chatResponse.lead || false,
+        intentId: chatResponse.intent_id || 'unrecognized_intent'
+      };
+    } catch (error) {
+      console.error('AI processing error:', error);
+      return { 
+        response: 'I apologize, but I\'m having trouble processing your request right now. Please try again later.',
+        followUpButtons: [],
+        ctaButton: null,
+        shouldShowLead: false,
+        intentId: 'unrecognized_intent'
+      };
+    }
+  }
 
   const httpServer = createServer(app);
   return httpServer;

@@ -14,56 +14,57 @@ const openai = new OpenAI({
   apiKey: String(process.env.OPENAI_API_KEY)
 });
 
-export async function generateChatResponse(
-  message: string,
-  systemPrompt: string,
-  trainingData?: string,
-  customApiKey?: string,
-  questionFlow?: any
-): Promise<string> {
-  try {
-    const client = customApiKey ? new OpenAI({ apiKey: customApiKey }) : openai;
+// DEPRECATED: Replaced by detectIntent function
+// export async function generateChatResponse(
+//   message: string,
+//   systemPrompt: string,
+//   trainingData?: string,
+//   customApiKey?: string,
+//   questionFlow?: any
+// ): Promise<string> {
+//   try {
+//     const client = customApiKey ? new OpenAI({ apiKey: customApiKey }) : openai;
 
-    let flowInstructions = '';
-    if (questionFlow) {
-      flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n\n**CRITICAL FLOW RULE:** Since there is an active question flow, NEVER introduce yourself or your company. The user is already engaged in a guided conversation. Respond directly to their question without any self-introduction, greetings, or company overview. Focus only on answering their specific question within the context of the ongoing flow.`;
-    }
+//     let flowInstructions = '';
+//     if (questionFlow) {
+//       flowInstructions = `\nThe following is the chatbot's question flow (conversation logic). Use this to guide your responses and next questions:\n${typeof questionFlow === 'string' ? questionFlow : JSON.stringify(questionFlow, null, 2)}\n\n**CRITICAL FLOW RULE:** Since there is an active question flow, NEVER introduce yourself or your company. The user is already engaged in a guided conversation. Respond directly to their question without any self-introduction, greetings, or company overview. Focus only on answering their specific question within the context of the ongoing flow.`;
+//     }
 
-    const systemMessage = `${systemPrompt}
-Instructions:
-Act as a world-class conversational AI assistant. Your main directive is to transform provided data into smooth, natural, and helpful conversational responses.
+//     const systemMessage = `${systemPrompt}
+// Instructions:
+// Act as a world-class conversational AI assistant. Your main directive is to transform provided data into smooth, natural, and helpful conversational responses.
 
-**Core Directives:**
-1. **Synthesize, Don't Regurgitate:** This is your top priority. You are forbidden from copying text directly from the provided context. You must read the context, understand the key points, and then formulate a completely original response in a conversational tone.
-2. **Be Conversational:** Frame your answers as if you are speaking to someone. End with a helpful closing or a question to keep the conversation going (e.g., "Does that make sense?" or "Is there anything else I can help you with?").
-3. **Efficiency and Focus:** Omit greetings in an active conversation. Stay focused on the user's query.
+// **Core Directives:**
+// 1. **Synthesize, Don't Regurgitate:** This is your top priority. You are forbidden from copying text directly from the provided context. You must read the context, understand the key points, and then formulate a completely original response in a conversational tone.
+// 2. **Be Conversational:** Frame your answers as if you are speaking to someone. End with a helpful closing or a question to keep the conversation going (e.g., "Does that make sense?" or "Is there anything else I can help you with?").
+// 3. **Efficiency and Focus:** Omit greetings in an active conversation. Stay focused on the user's query.
 
-**Example of How to Respond:**
-[START OF EXAMPLE]
-**Provided Context:** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com to receive an RMA number."
-**User Question:** "How do I return something?"
-**Bad Response (DO NOT DO THIS):** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com."
-**Good Response (RESPOND LIKE THIS):** "You can certainly return an item! Just make sure it's within 30 days of purchase and that the item is still in its original, unopened packaging. To get started, simply send an email to our support team at support@example.com to get a return number (RMA). Let me know if you need help with anything else!"
-[END OF EXAMPLE]
+// **Example of How to Respond:**
+// [START OF EXAMPLE]
+// **Provided Context:** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com to receive an RMA number."
+// **User Question:** "How do I return something?"
+// **Bad Response (DO NOT DO THIS):** "Our return policy allows for returns within 30 days of purchase. The item must be in its original, unopened packaging. To initiate a return, customers must contact support@example.com."
+// **Good Response (RESPOND LIKE THIS):** "You can certainly return an item! Just make sure it's within 30 days of purchase and that the item is still in its original, unopened packaging. To get started, simply send an email to our support team at support@example.com to get a return number (RMA). Let me know if you need help with anything else!"
+// [END OF EXAMPLE]
 
-${flowInstructions}${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`;
+// ${flowInstructions}${trainingData ? `Additional context and training data:\n${trainingData}` : ''}`;
 
-    const response = await client.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: message }
-      ],
-      max_tokens: 800,
-      temperature: 0.8,
-    });
+//     const response = await client.chat.completions.create({
+//       model: "gpt-3.5-turbo",
+//       messages: [
+//         { role: "system", content: systemMessage },
+//         { role: "user", content: message }
+//       ],
+//       max_tokens: 800,
+//       temperature: 0.8,
+//     });
 
-    return response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
-  } catch (error: any) {
-    console.error("OpenAI API error:", error);
-    throw new Error("Failed to generate AI response");
-  }
-}
+//     return response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
+//   } catch (error: any) {
+//     console.error("OpenAI API error:", error);
+//     throw new Error("Failed to generate AI response");
+//   }
+// }
 
 export async function processTrainingData(content: string): Promise<{
   processed: boolean;
@@ -422,25 +423,48 @@ Return only the response text, formatted for clarity and relevance as described 
 `;
 
       if (aiProvider === 'google' || aiProvider === 'platform') {
-        const key = aiProvider === 'google' ? customApiKey : process.env.GEMINI_API_KEY;
-        const ai = new GoogleGenAI({ apiKey: String(key) });
-        const customResponse = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [{ role: "user", parts: [{ text: botPrompt }] }],
-        });
-        finalMessageText = customResponse.text?.trim() || relevantTrainingData.default_response_text;
+        try {
+          const key = aiProvider === 'google' ? customApiKey : process.env.GEMINI_API_KEY;
+          console.log('Gemini API key check:', {
+            aiProvider,
+            hasCustomApiKey: !!customApiKey,
+            hasEnvKey: !!process.env.GEMINI_API_KEY,
+            keyLength: key ? key.length : 0
+          });
+          if (!key) {
+            console.error('Gemini API key not found');
+            finalMessageText = relevantTrainingData.default_response_text;
+          } else {
+            const ai = new GoogleGenAI({ apiKey: String(key) });
+            const customResponse = await ai.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: [{ role: "user", parts: [{ text: botPrompt }] }],
+            });
+            finalMessageText = customResponse.text?.trim() || relevantTrainingData.default_response_text;
+          }
+        } catch (error) {
+          console.error('Gemini API error:', error);
+          // Fallback to default response
+          finalMessageText = relevantTrainingData.default_response_text;
+        }
       } else {
-        const openai = new OpenAI({ apiKey: customApiKey || process.env.OPENAI_API_KEY });
-        const response = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: "You are a helpful chatbot." },
-            { role: "user", content: botPrompt }
-          ],
-          max_tokens: 800,
-          temperature: 0.8,
-        });
-        finalMessageText = response.choices[0].message.content?.trim() || relevantTrainingData.default_response_text;
+        try {
+          const openai = new OpenAI({ apiKey: customApiKey || process.env.OPENAI_API_KEY });
+          const response = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+              { role: "system", content: "You are a helpful chatbot." },
+              { role: "user", content: botPrompt }
+            ],
+            max_tokens: 800,
+            temperature: 0.8,
+          });
+          finalMessageText = response.choices[0].message.content?.trim() || relevantTrainingData.default_response_text;
+        } catch (error) {
+          console.error('OpenAI API error:', error);
+          // Fallback to default response
+          finalMessageText = relevantTrainingData.default_response_text;
+        }
       }
 
       finalFollowUpOptions = relevantTrainingData.follow_up_options;
@@ -455,27 +479,91 @@ Return only the response text, formatted for clarity and relevance as described 
       finalCtaButton = { text: globalConfig.default_cta_text, link: globalConfig.default_cta_link };
     }
 
-    // --- Determine if lead form should be shown ---
-    let conversationTurns = 0;
-    if (history && Array.isArray(history)) {
-      conversationTurns = history.filter(h => h.role === 'user').length;
-    }
-
+    // --- AI-powered lead detection ---
     let shouldShowLead = false;
     if (chatbot.leadCollectionEnabled) {
-      const highValueIntents = ['contact_info', 'pricing', 'services', 'booking', 'appointment', 'demo'];
-      // Show immediately for high-value intents
-      if (highValueIntents.includes(detectedIntentLabel)) {
-        shouldShowLead = true;
-      }
-      // After 3 user messages, only show if the current intent is high-value, general inquiry, or unrecognized
-      else if (
-        conversationTurns >= 3 &&
-        (highValueIntents.includes(detectedIntentLabel) ||
-         detectedIntentLabel === 'general_inquiry' ||
-         detectedIntentLabel === 'unrecognized_intent')
-      ) {
-        shouldShowLead = true;
+      try {
+        // Prepare conversation context for AI
+        const conversationTurns = history && Array.isArray(history) ? history.filter(h => h.role === 'user').length : 0;
+        const recentMessages = history && Array.isArray(history) ? history.slice(-6) : []; // Last 6 messages
+        
+        const conversationContext = recentMessages.length > 0 
+          ? `\nRecent conversation:\n${recentMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
+          : '';
+
+        // Create AI prompt for lead detection
+        const leadDetectionPrompt = `You are an AI assistant that determines when to show a lead collection form to website visitors.
+
+**Context:**
+- Current user message: "${message}"
+- Detected intent: "${detectedIntentLabel}"
+- Conversation turns: ${conversationTurns}
+- Chatbot purpose: ${chatbot.name || 'Customer support'}
+${conversationContext}
+
+**Lead Collection Rules:**
+1. Show lead form when user shows buying intent, needs pricing, wants to contact, or requests services
+2. Show lead form after 2-3 meaningful exchanges to build trust first
+3. Don't show immediately for simple greetings or basic questions
+4. Consider the conversation flow and user engagement level
+5. Show for high-value interactions like pricing inquiries, service requests, or contact requests
+
+**Decision Factors:**
+- User's current message content and intent
+- Conversation length and engagement
+- Whether user is asking for specific information that requires follow-up
+- Natural conversation flow and timing
+
+**Output:** Respond with ONLY "YES" if you should show the lead form, or "NO" if not.`;
+
+        if (aiProvider === 'google' || aiProvider === 'platform') {
+          // Use Gemini for lead detection
+          const key = aiProvider === 'google' ? customApiKey : process.env.GEMINI_API_KEY;
+          if (key) {
+            const ai = new GoogleGenAI({ apiKey: String(key) });
+            const response = await ai.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: [{ role: "user", parts: [{ text: leadDetectionPrompt }] }],
+            });
+            
+            const aiDecision = response.text?.trim().toUpperCase() || 'NO';
+            shouldShowLead = aiDecision === 'YES';
+            
+            console.log(`[AI Lead Detection] Gemini decision: ${aiDecision} for intent: ${detectedIntentLabel}`);
+          }
+        } else {
+          // Use OpenAI for lead detection
+          const openai = new OpenAI({ apiKey: customApiKey || process.env.OPENAI_API_KEY });
+          const response = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+              { role: "system", content: "You are an AI assistant that determines when to show lead collection forms. Respond with ONLY 'YES' or 'NO'." },
+              { role: "user", content: leadDetectionPrompt }
+            ],
+            max_tokens: 10,
+            temperature: 0.1,
+          });
+          
+          const aiDecision = response.choices[0].message.content?.trim().toUpperCase() || 'NO';
+          shouldShowLead = aiDecision === 'YES';
+          
+          console.log(`[AI Lead Detection] OpenAI decision: ${aiDecision} for intent: ${detectedIntentLabel}`);
+        }
+      } catch (error) {
+        console.error('[AI Lead Detection] Error:', error);
+        
+        // Fallback to basic logic if AI fails
+        const conversationTurns = history && Array.isArray(history) ? history.filter(h => h.role === 'user').length : 0;
+        const highValueIntents = ['contact_info', 'pricing', 'services', 'booking', 'appointment', 'demo'];
+        
+        if (highValueIntents.includes(detectedIntentLabel)) {
+          shouldShowLead = true;
+        } else if (conversationTurns >= 3 && 
+                  (highValueIntents.includes(detectedIntentLabel) ||
+                   detectedIntentLabel === 'general_inquiry' ||
+                   detectedIntentLabel === 'unrecognized_intent')) {
+          shouldShowLead = true;
+        }
       }
     }
 

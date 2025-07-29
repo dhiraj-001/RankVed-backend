@@ -34,12 +34,14 @@ app.use((req, res, next) => {
   const isPublicWidgetEndpoint =
     req.originalUrl.match(/^\/api\/chatbots\/[\w-]+\/public$/) ||
     req.originalUrl.match(/^\/api\/chat\/[\w-]+\/message$/) ||
-    req.originalUrl.match(/^\/api\/chat\/[\w-]+\/leads$/); // <-- add this line
+    req.originalUrl.match(/^\/api\/chat\/[\w-]+\/leads$/) ||
+    req.originalUrl.match(/^\/api\/chatbot\/[\w-]+\/config$/) ||
+    req.originalUrl.match(/^\/api\/chat$/);
 
   if (isPublicWidgetEndpoint) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-Domain, X-Referer, X-Chatbot-ID');
     if (req.method === 'OPTIONS') {
       res.sendStatus(200);
       return;

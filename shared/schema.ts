@@ -40,7 +40,7 @@ export const chatbots = pgTable("chatbots", {
   chatWidgetName: text("chat_widget_name").default("Support Chat"), // Name displayed in chat widget
   
   // Messaging
-  welcomeMessage: text("welcome_message").default("Hello! How can I help you today?"),
+  welcomeMessage: text("welcome_message"),
   initialMessageDelay: integer("initial_message_delay").default(1000), // ms
   
   // Popup Sound
