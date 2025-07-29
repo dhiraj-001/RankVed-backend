@@ -395,9 +395,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Public endpoint for embed widget configuration
   app.get("/api/chatbots/:id/public", async (req, res) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
     try {
       const chatbot = await storage.getChatbot(req.params.id);
       if (!chatbot) {
@@ -439,9 +436,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Chat widget route - serves the chat interface in an iframe
   app.get("/chat/:chatbotId", async (req, res) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization");
     try {
       const chatbot = await storage.getChatbot(req.params.chatbotId);
       if (!chatbot || !chatbot.isActive) {
@@ -519,18 +513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.options('/api/leads', (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-    res.status(200).end();
-  });
-
   app.post("/api/leads", async (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-    if (req.method === 'OPTIONS') return res.status(200).end();
     try {
       const leadData = insertLeadSchema.parse(req.body);
       const lead = await storage.createLead(leadData);
@@ -575,17 +558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public lead collection endpoint for chat widgets
-  app.options('/api/chat/:chatbotId/leads', (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-    res.status(200).end();
-  });
-
   app.post('/api/chat/:chatbotId/leads', async (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     
     console.log('[Lead Collection] Request received:', {
       chatbotId: req.params.chatbotId,
@@ -634,8 +607,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Domain security validation
       const origin = req.headers.origin || req.headers.referer;
       if (process.env.MODE !== 'development') {
-        if (chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
-          const isAllowed = chatbot.allowedDomains.some(domain => {
+        if (chatbot.allowedDomains && Array.isArray(chatbot.allowedDomains) && chatbot.allowedDomains.length > 0) {
+          const isAllowed = chatbot.allowedDomains.some((domain: string) => {
             if (origin) {
               return origin.includes(domain);
             }
@@ -1019,8 +992,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // --- Domain validation logic restored ---
       if (process.env.MODE !== 'development') {
         const chatbot = await storage.getChatbot(chatbotId);
-        if (chatbot && chatbot.allowedDomains && chatbot.allowedDomains.length > 0) {
-          const isAllowed = chatbot.allowedDomains.some(domain => {
+        if (chatbot && chatbot.allowedDomains && Array.isArray(chatbot.allowedDomains) && chatbot.allowedDomains.length > 0) {
+          const isAllowed = chatbot.allowedDomains.some((domain: string) => {
             if (origin) {
               return origin.includes(domain);
             }
@@ -1207,14 +1180,14 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
 
   // Chatbot configuration API endpoint for external chatbot
   app.options("/api/chatbot/:chatbotId/config", (req, res) => {
-    const origin = req.headers.origin?.toString();
-    setCORSHeaders(res, origin);
+    // Explicit OPTIONS handler for chatbot config
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Domain,X-Referer,X-Chatbot-ID");
     res.status(200).end();
   });
   
   app.get("/api/chatbot/:chatbotId/config", async (req: Request, res: Response) => {
-    const origin = req.headers.origin?.toString();
-    setCORSHeaders(res, origin);
     
     try {
       const { chatbotId } = req.params;
@@ -1244,22 +1217,20 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
       }
 
       // Domain validation - check if domain is allowed
-      if (chatbotData.allowedDomains && chatbotData.allowedDomains.length > 0) {
+      if (chatbotData.allowedDomains && Array.isArray(chatbotData.allowedDomains) && chatbotData.allowedDomains.length > 0) {
         try {
           const allowedDomains = chatbotData.allowedDomains;
-          if (Array.isArray(allowedDomains) && allowedDomains.length > 0) {
-            const currentDomain = domain || '';
-            const isAllowed = allowedDomains.some(allowedDomain => 
-              currentDomain.includes(allowedDomain) || 
-              allowedDomain.includes(currentDomain)
-            );
-            
-            if (!isAllowed) {
-              console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
-              return res.status(403).json({ 
-                error: 'Domain not authorized for this chatbot' 
-              });
-            }
+          const currentDomain = domain || '';
+          const isAllowed = allowedDomains.some((allowedDomain: string) => 
+            currentDomain.includes(allowedDomain) || 
+            allowedDomain.includes(currentDomain)
+          );
+          
+          if (!isAllowed) {
+            console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
+            return res.status(403).json({ 
+              error: 'Domain not authorized for this chatbot' 
+            });
           }
         } catch (error) {
           console.error('Error checking allowed domains:', error instanceof Error ? error.message : 'Unknown error');
@@ -1343,8 +1314,17 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
     }
   });
 
-  // Chatbot embed API endpoint
-app.post("/api/chat", async (req: Request, res: Response) => {
+  // Chat endpoint OPTIONS handler
+  app.options("/api/chat", (req, res) => {
+    // Explicit OPTIONS handler for chat endpoint
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Domain,X-Referer,X-Chatbot-ID");
+    res.status(200).end();
+  });
+
+  app.post("/api/chat", async (req: Request, res: Response) => {
+    
     try {
       const { message, sessionId, chatbotId } = req.body;
       const domain = req.headers['x-domain'];
@@ -1381,25 +1361,23 @@ app.post("/api/chat", async (req: Request, res: Response) => {
       const chatbotData = chatbot[0];
 
       // Domain validation - check if domain is allowed
-      if (chatbotData.allowedDomains && typeof chatbotData.allowedDomains === 'string' && chatbotData.allowedDomains.trim() !== '') {
+      if (chatbotData.allowedDomains && Array.isArray(chatbotData.allowedDomains) && chatbotData.allowedDomains.length > 0) {
         try {
-          const allowedDomains = JSON.parse(chatbotData.allowedDomains);
-          if (Array.isArray(allowedDomains) && allowedDomains.length > 0) {
-            const currentDomain = domain || '';
-            const isAllowed = allowedDomains.some(allowedDomain => 
-              currentDomain.includes(allowedDomain) || 
-              allowedDomain.includes(currentDomain)
-            );
-            
-            if (!isAllowed) {
-              console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
-              return res.status(403).json({ 
-                error: 'Domain not authorized for this chatbot' 
-              });
-            }
+          const allowedDomains = chatbotData.allowedDomains;
+          const currentDomain = domain || '';
+          const isAllowed = allowedDomains.some((allowedDomain: string) => 
+            currentDomain.includes(allowedDomain) || 
+            allowedDomain.includes(currentDomain)
+          );
+          
+          if (!isAllowed) {
+            console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
+            return res.status(403).json({ 
+              error: 'Domain not authorized for this chatbot' 
+            });
           }
         } catch (error) {
-          console.error('Error parsing allowed domains:', error instanceof Error ? error.message : 'Unknown error');
+          console.error('Error checking allowed domains:', error instanceof Error ? error.message : 'Unknown error');
           // Continue without domain validation if parsing fails
         }
       }

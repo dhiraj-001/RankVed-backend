@@ -39,13 +39,18 @@ app.use((req, res, next) => {
     req.originalUrl.match(/^\/api\/chat$/);
 
   if (isPublicWidgetEndpoint) {
+    console.log(`[CORS] Public widget endpoint detected: ${req.method} ${req.originalUrl}`);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-Domain, X-Referer, X-Chatbot-ID');
+    res.setHeader('Vary', 'Origin');
+    
     if (req.method === 'OPTIONS') {
-      res.sendStatus(200);
+      console.log(`[CORS] Handling OPTIONS preflight for: ${req.originalUrl}`);
+      res.status(200).end();
       return;
     }
+    console.log(`[CORS] Allowing request: ${req.method} ${req.originalUrl}`);
     return next();
   }
 
