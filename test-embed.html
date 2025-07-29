@@ -62,40 +62,13 @@
         </div>
     </div>
 
-    <!-- ChatBot Pro Embed Code -->
+    <!-- RankVed Chatbot Embed Code -->
     <script>
-      (function() {
-        // Prevent multiple loads
-        if (window.chatBotProInitialized) return;
-        window.chatBotProInitialized = true;
-        
-        const chatbotConfig = {
-          chatbotId: '1272a388-d86e-4239-9d67-fe0257148f00',
-          primaryColor: '#38e8ff',
-          position: 'bottom-right'
-        };
-        
-        function loadChatBot() {
-          const script = document.createElement('script');
-          script.src = window.location.origin + '/chat-widget-embed.js';
-          script.onload = function() {
-            if (window.ChatBotWidget && window.ChatBotWidget.init) {
-              window.ChatBotWidget.init(chatbotConfig);
-            }
-          };
-          script.onerror = function() {
-            console.error('Failed to load ChatBot Widget');
-          };
-          document.head.appendChild(script);
-        }
-        
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', loadChatBot);
-        } else {
-          loadChatBot();
-        }
-      })();
+      window.RankVedChatbotConfig = {
+        chatbotId: '69e4c724-2aa1-447c-8d4b-52812d77ba08'
+      };
     </script>
-    <!-- End ChatBot Pro Embed Code -->
+    <script src="/chatbot-loader.js"></script>
+    <!-- End RankVed Chatbot Embed Code -->
 </body>
 </html>
