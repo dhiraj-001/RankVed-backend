@@ -502,19 +502,36 @@ Return only the response text, formatted for clarity and relevance as described 
 ${conversationContext}
 
 **Lead Collection Rules:**
-1. Show lead form when user shows buying intent, needs pricing, wants to contact, or requests services
-2. Show lead form after 2-3 meaningful exchanges to build trust first
-3. Don't show immediately for simple greetings or basic questions
-4. Consider the conversation flow and user engagement level
-5. Show for high-value interactions like pricing inquiries, service requests, or contact requests
+1. Show lead form for ANY high-value interaction that could benefit from follow-up
+2. Show lead form when user shows buying intent, needs pricing, wants to contact, or requests services
+3. Show lead form for product inquiries, feature questions, or technical support requests
+4. Show lead form for booking requests, appointment scheduling, or demo requests
+5. Show lead form for complaints, feedback, or support issues that need escalation
+6. Show lead form for partnership inquiries, business opportunities, or collaboration requests
+7. Show lead form after 2-3 meaningful exchanges to build trust first
+8. Don't show immediately for simple greetings or basic questions
+9. Consider the conversation flow and user engagement level
+
+**High-Value Interactions (ALWAYS show lead form):**
+- Pricing inquiries, quotes, or cost questions
+- Product demonstrations, trials, or evaluations
+- Service requests or consultations
+- Technical support or troubleshooting
+- Booking appointments or scheduling
+- Partnership or business opportunities
+- Feedback, complaints, or escalations
+- Feature requests or customization needs
+- Training or implementation requests
+- Any request that requires human follow-up
 
 **Decision Factors:**
 - User's current message content and intent
 - Conversation length and engagement
 - Whether user is asking for specific information that requires follow-up
 - Natural conversation flow and timing
+- Potential business value of the interaction
 
-**Output:** Respond with ONLY "YES" if you should show the lead form, or "NO" if not.`;
+**Output:** Respond with ONLY "YES" if you should show the lead form, or "NO" if not. Be generous with "YES" - if there's any potential business value or need for follow-up, show the lead form.`;
 
         if (aiProvider === 'google' || aiProvider === 'platform') {
           // Use Gemini for lead detection
@@ -554,14 +571,30 @@ ${conversationContext}
         
         // Fallback to basic logic if AI fails
         const conversationTurns = history && Array.isArray(history) ? history.filter(h => h.role === 'user').length : 0;
-        const highValueIntents = ['contact_info', 'pricing', 'services', 'booking', 'appointment', 'demo'];
+        const highValueIntents = [
+          'contact_info', 'pricing', 'services', 'booking', 'appointment', 'demo',
+          'product_inquiry', 'feature_request', 'technical_support', 'complaint',
+          'feedback', 'partnership', 'business_opportunity', 'collaboration',
+          'training', 'implementation', 'customization', 'quote', 'trial',
+          'evaluation', 'consultation', 'escalation'
+        ];
         
+        // More aggressive lead collection - show for most business-relevant interactions
         if (highValueIntents.includes(detectedIntentLabel)) {
           shouldShowLead = true;
-        } else if (conversationTurns >= 3 && 
-                  (highValueIntents.includes(detectedIntentLabel) ||
-                   detectedIntentLabel === 'general_inquiry' ||
-                   detectedIntentLabel === 'unrecognized_intent')) {
+        } else if (conversationTurns >= 2 && 
+                  (detectedIntentLabel === 'general_inquiry' ||
+                   detectedIntentLabel === 'unrecognized_intent' ||
+                   message.toLowerCase().includes('price') ||
+                   message.toLowerCase().includes('cost') ||
+                   message.toLowerCase().includes('demo') ||
+                   message.toLowerCase().includes('trial') ||
+                   message.toLowerCase().includes('book') ||
+                   message.toLowerCase().includes('schedule') ||
+                   message.toLowerCase().includes('help') ||
+                   message.toLowerCase().includes('support') ||
+                   message.toLowerCase().includes('problem') ||
+                   message.toLowerCase().includes('issue'))) {
           shouldShowLead = true;
         }
       }
