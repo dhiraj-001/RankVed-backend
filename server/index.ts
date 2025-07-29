@@ -17,42 +17,12 @@ const app = express();
 const allowedOriginsEnv = process.env.FRONTEND_URLS || '';
 const allowedOrigins = allowedOriginsEnv.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0);
 
+// CORS middleware - must be applied before any other middleware
 app.use((req, res, next) => {
-  // Handle OPTIONS requests first to prevent redirects
-  if (req.method === 'OPTIONS') {
-    // Allow all origins for public widget endpoints
-    const isPublicWidgetEndpoint =
-      req.originalUrl.match(/^\/api\/intent-detect(\/[^\/]+)?$/) ||
-      req.originalUrl.match(/^\/api\/chatbots\/[\w-]+\/public$/) ||
-      req.originalUrl.match(/^\/api\/chat\/[\w-]+\/message$/) ||
-      req.originalUrl.match(/^\/api\/chat\/[\w-]+\/leads$/) ||
-      req.originalUrl.match(/^\/api\/chatbot\/[\w-]+\/config$/) ||
-      req.originalUrl.match(/^\/api\/chat$/);
-
-    if (isPublicWidgetEndpoint) {
-      console.log(`[CORS] Handling OPTIONS preflight for public endpoint: ${req.originalUrl}`);
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-Domain, X-Referer, X-Chatbot-ID');
-      res.setHeader('Vary', 'Origin');
-      res.status(200).end();
-      return;
-    }
-
-    // Handle other OPTIONS requests
-    const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    }
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
-    res.status(200).end();
-    return;
-  }
-
-  // Handle actual requests (non-OPTIONS)
-  // Allow all origins for public widget endpoints
+  // Always set CORS headers for all requests
+  const origin = req.headers.origin;
+  
+  // Check if this is a public widget endpoint
   const isPublicWidgetEndpoint =
     req.originalUrl.match(/^\/api\/intent-detect(\/[^\/]+)?$/) ||
     req.originalUrl.match(/^\/api\/chatbots\/[\w-]+\/public$/) ||
@@ -61,24 +31,44 @@ app.use((req, res, next) => {
     req.originalUrl.match(/^\/api\/chatbot\/[\w-]+\/config$/) ||
     req.originalUrl.match(/^\/api\/chat$/);
 
+  console.log(`[CORS] Request: ${req.method} ${req.originalUrl} | Origin: ${origin} | Public: ${isPublicWidgetEndpoint}`);
+
+  // Always set CORS headers for public endpoints
   if (isPublicWidgetEndpoint) {
-    console.log(`[CORS] Public widget endpoint detected: ${req.method} ${req.originalUrl}`);
+    console.log(`[CORS] Public widget endpoint: ${req.method} ${req.originalUrl}`);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-Domain, X-Referer, X-Chatbot-ID');
     res.setHeader('Vary', 'Origin');
-    console.log(`[CORS] Allowing request: ${req.method} ${req.originalUrl}`);
-    return next();
+  } else {
+    // For admin/private APIs, only allow specific origins
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
   }
 
-  // Admin/private APIs (allow only allowed origins)
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  // Handle OPTIONS requests (preflight) - this must be done before any other processing
+  if (req.method === 'OPTIONS') {
+    console.log(`[CORS] Handling OPTIONS preflight for: ${req.originalUrl}`);
+    res.status(200).end();
+    return;
   }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie');
+
+  next();
+});
+
+// Additional CORS middleware for any requests that might have been missed
+app.use((req, res, next) => {
+  // If CORS headers are not set, set them as a fallback
+  if (!res.getHeader('Access-Control-Allow-Origin')) {
+    console.log(`[CORS] Fallback CORS headers for: ${req.method} ${req.originalUrl}`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-Domain, X-Referer, X-Chatbot-ID');
+  }
   next();
 });
 

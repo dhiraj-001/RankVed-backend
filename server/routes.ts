@@ -1167,6 +1167,8 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
   // Chatbot configuration API endpoint for external chatbot
   
   app.get("/api/chatbot/:chatbotId/config", async (req: Request, res: Response) => {
+    console.log(`[Chatbot Config] Request received: ${req.method} ${req.originalUrl}`);
+    console.log(`[Chatbot Config] Headers:`, req.headers);
     
     try {
       const { chatbotId } = req.params;
