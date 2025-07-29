@@ -956,23 +956,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     `);
   });
 
-  function setCORSHeaders(res: Response, origin?: string) {
-    // In production, only allow specific origins (if provided)
-    const allowOrigin = process.env.MODE === "production" && origin 
-      ? origin 
-      : "*";
-    
-    res.header("Access-Control-Allow-Origin", allowOrigin);
-    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Domain,X-Referer,X-Chatbot-ID");
-    res.header("Vary", "Origin"); // Important for caching with multiple origins
-  }
+
   
-  app.options("/api/intent-detect", (req, res) => {
-    console.log("hello")
-    setCORSHeaders(res, req.headers.origin?.toString());
-    res.status(200).end();
-  });
+
   
   app.post("/api/intent-detect/:chatbotId", async (req: Request, res: Response) => {
     const origin = req.headers.origin?.toString();
@@ -1179,13 +1165,6 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
   });
 
   // Chatbot configuration API endpoint for external chatbot
-  app.options("/api/chatbot/:chatbotId/config", (req, res) => {
-    // Explicit OPTIONS handler for chatbot config
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Domain,X-Referer,X-Chatbot-ID");
-    res.status(200).end();
-  });
   
   app.get("/api/chatbot/:chatbotId/config", async (req: Request, res: Response) => {
     
@@ -1314,14 +1293,7 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
     }
   });
 
-  // Chat endpoint OPTIONS handler
-  app.options("/api/chat", (req, res) => {
-    // Explicit OPTIONS handler for chat endpoint
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Domain,X-Referer,X-Chatbot-ID");
-    res.status(200).end();
-  });
+  // Chat endpoint
 
   app.post("/api/chat", async (req: Request, res: Response) => {
     
