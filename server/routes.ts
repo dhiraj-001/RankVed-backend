@@ -1189,18 +1189,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing or invalid 'chatbotId' in URL parameter" });
       }
 
-      // --- Domain validation logic restored ---
-      if (process.env.MODE !== 'development') {
+      // --- Domain validation logic with FRONTEND_URL bypass ---
+      if (process.env.MODE !== 'development' ) {
         const chatbot = await storage.getChatbot(chatbotId);
         if (chatbot && chatbot.allowedDomains && Array.isArray(chatbot.allowedDomains) && chatbot.allowedDomains.length > 0) {
-          const isAllowed = chatbot.allowedDomains.some((domain: string) => {
-            if (origin) {
-              return origin.includes(domain);
+          // Check if request is from FRONTEND_URL (always allow)
+          const frontendUrl = process.env.FRONTEND_URL;
+          const isFromFrontend = frontendUrl && origin && origin.includes(new URL(frontendUrl).hostname);
+          
+          if (!isFromFrontend) {
+            // Only check allowed domains if not from frontend
+            const isAllowed = chatbot.allowedDomains.some((domain: string) => {
+              if (origin) {
+                return origin.includes(domain);
+              }
+              return false;
+            });
+            if (!isAllowed) {
+              return res.status(403).json({ error: "Domain not authorized to use this chatbot" });
             }
-            return false;
-          });
-          if (!isAllowed) {
-            return res.status(403).json({ error: "Domain not authorized to use this chatbot" });
           }
         }
       }
@@ -1553,22 +1560,30 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
 
       const chatbotData = chatbot[0];
 
-      // Domain validation - check if domain is allowed
+      // Domain validation - check if domain is allowed (with FRONTEND_URL bypass)
       if (process.env.MODE !== 'development') {
         if (chatbotData.allowedDomains && Array.isArray(chatbotData.allowedDomains) && chatbotData.allowedDomains.length > 0) {
           try {
-            const allowedDomains = chatbotData.allowedDomains;
-            const currentDomain = domain || '';
-            const isAllowed = allowedDomains.some((allowedDomain: string) => 
-              currentDomain.includes(allowedDomain) || 
-              allowedDomain.includes(currentDomain)
-            );
+            // Check if request is from FRONTEND_URL (always allow)
+            const frontendUrl = process.env.FRONTEND_URL;
+            const isFromFrontend = frontendUrl && domain && domain.includes(new URL(frontendUrl).hostname);
+            console.log(`[Domain Validation] Origin: ${origin}, Domain: ${domain}, Frontend URL: ${frontendUrl}, Is from frontend: ${isFromFrontend}`);
             
-            if (!isAllowed) {
-              console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
-              return res.status(403).json({ 
-                error: 'Domain not authorized for this chatbot' 
-              });
+            if (!isFromFrontend) {
+              // Only check allowed domains if not from frontend
+              const allowedDomains = chatbotData.allowedDomains;
+              const currentDomain = domain || '';
+              const isAllowed = allowedDomains.some((allowedDomain: string) => 
+                currentDomain.includes(allowedDomain) || 
+                allowedDomain.includes(currentDomain)
+              );
+              
+              if (!isAllowed) {
+                console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
+                return res.status(403).json({ 
+                  error: 'Domain not authorized for this chatbot' 
+                });
+              }
             }
           } catch (error) {
             console.error('Error checking allowed domains:', error instanceof Error ? error.message : 'Unknown error');
