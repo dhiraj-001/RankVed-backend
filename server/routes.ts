@@ -1227,6 +1227,9 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
         // API URL for the chatbot to use
         apiUrl: process.env.VITE_API_URL || req.protocol + '://' + req.get('host'),
         
+        // Frontend URL for loading chatbot assets
+        frontendUrl: process.env.FRONTEND_URL || (req.protocol + '://' + req.get('host')),
+        
         // Appearance
         primaryColor: chatbotData.primaryColor || '#6366F1',
         secondaryColor: chatbotData.secondaryColor || '#797cf6d4',
