@@ -1170,7 +1170,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/intent-detect/:chatbotId", async (req: Request, res: Response) => {
     const origin = req.headers.origin?.toString();
-    setCORSHeaders(res, origin);
     try {
       const { message, history, sessionId } = req.body;
       const { chatbotId } = req.params;
