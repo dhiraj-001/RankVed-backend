@@ -406,7 +406,7 @@ Website: ${website || "Not available"}
 ${leadCollectionInstruction}${greetingInstruction}
 
 Based on the user's intent "${detectedIntentLabel}", and the message "${message}", generate a response that is:
-- As relevant and concise as possible.try to round up in 1 to 2 sentences.
+- As relevant and concise as possible.try to round up in 1 to 2 short sentences.
 - If the answer can be made clearer as a list, use bullet points (use '-' for each point).
 - If there are any important keywords, actions, or values, highlight them using double asterisks (e.g., **important**).
 - Try to avoid answering in paragraphs; use the most direct and clear format for the answer.always use line breaks to make it more readable.
@@ -473,11 +473,19 @@ Return only the response text, formatted for clarity and relevance as described 
         : undefined;
 
     } else {
-      // Intent not recognized or no relevant training data
-      finalMessageText = globalConfig.default_unrecognized_intent_message;
-      finalFollowUpOptions = [];
-      finalCtaButton = { text: globalConfig.default_cta_text, link: globalConfig.default_cta_link };
-    }
+        // Intent not recognized, so treat it as a general AI query.
+        console.log('[detectIntent] Intent not recognized. Handling as a general query.');
+        
+        // Prepare a general prompt for the AI.
+        const systemPrompt = aiSystemPrompt || "You are a helpful and knowledgeable AI assistant.";
+        const generalQueryPrompt = `${systemPrompt}
+    
+    Please provide a helpful and concise response to the user's message. you can take any context whatever you know
+    User Message: "${message}"`;
+
+                // Generate response for unrecognized intent
+        finalMessageText = "I understand your question. Let me help you with that.";
+      }
 
     // --- AI-powered lead detection ---
     let shouldShowLead = false;
@@ -600,9 +608,30 @@ ${conversationContext}
       }
     }
 
+    // --- Add lead invitation if shouldShowLead is true ---
+    let finalMessageWithLeadInvitation = finalMessageText;
+    if (shouldShowLead) {
+      // Add a natural lead invitation sentence
+      const leadInvitations = [
+        "\n\n💬 **Quick question:** Would you like to share your contact details?",
+        "\n\n📞 **Stay connected:** Leave your contact info below!",
+        "\n\n✨ **Get help:** Share your details for personalized assistance!",
+        "\n\n🎯 **Better service:** Leave your contact info below!",
+        "\n\n📧 **Stay in touch:** Share your details below!"
+      ];
+      
+      // Select a random invitation or use the first one
+      const randomIndex = Math.floor(Math.random() * leadInvitations.length);
+      const leadInvitation = leadInvitations[randomIndex];
+      
+      finalMessageWithLeadInvitation = finalMessageText + leadInvitation;
+      
+      console.log('[detectIntent] Added lead invitation to response');
+    }
+
     // --- Format Response for UI ---
     const responseForUI: ChatResponse = {
-      message_text: finalMessageText,
+      message_text: finalMessageWithLeadInvitation,
       follow_up_buttons: finalFollowUpOptions.map(option => ({
         text: option.option_text,
         payload: option.associated_intent_id || (option.cta_button_link ? { type: "cta_option", link: option.cta_button_link } : "no_action")

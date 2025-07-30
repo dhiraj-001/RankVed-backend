@@ -1031,20 +1031,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Iframe Service] Frontend URL: ${frontendUrl}`);
 
       // Set headers
-      res.setHeader('Content-Type', 'text/html');
-      res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('X-Frame-Options', 'ALLOWALL');
       res.setHeader('X-Content-Type-Options', 'nosniff');
 
       // Generate the iframe HTML
       const iframeHtml = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
           <title>${chatbotData.name || 'Chatbot'}</title>
-          <style>
+        <style>
             html, body { 
               height: 100%; 
               margin: 0; 
@@ -1078,12 +1078,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               0% { transform: rotate(0deg); }
               100% { transform: rotate(360deg); }
             }
-          </style>
-        </head>
-        <body>
+        </style>
+      </head>
+      <body>
         
           
-          <script>
+        <script>
             // Global configuration for the chatbot
             window.RankVedChatbotConfig = {
               chatbotId: "${chatbotData.id}",
@@ -1131,7 +1131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log('[Iframe] RankVed Chatbot Config:', window.RankVedChatbotConfig);
             console.log('[Iframe] Domain:', window.CHATBOT_DOMAIN);
             console.log('[Iframe] Referer:', window.CHATBOT_REFERER);
-          </script>
+        </script>
           
           <!-- Load the chatbot loader script -->
           <script src="${frontendUrl}/chatbot-loader.js"></script>
@@ -1158,9 +1158,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <h2 class="error">Error Loading Chatbot</h2>
           <p>There was an error loading the chatbot interface.</p>
           <p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
-        </body>
-        </html>
-      `);
+      </body>
+      </html>
+    `);
     }
   });
 
