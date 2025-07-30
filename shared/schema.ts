@@ -44,7 +44,7 @@ export const chatbots = pgTable("chatbots", {
   initialMessageDelay: integer("initial_message_delay").default(1000), // ms
   
   // Popup Sound
-  popupSoundEnabled: boolean("popup_sound_enabled").default(true),
+  popupSoundEnabled: boolean("popup_sound_enabled").default(false),
   customPopupSound: text("custom_popup_sound"), // Data URI for custom popup sound
   popupSoundVolume: integer("popup_sound_volume").default(50), // 0-100
   

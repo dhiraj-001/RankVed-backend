@@ -712,6 +712,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/custom-sounds", authenticateUser, async (req: any, res: any) => {
+    try {
+      if (!req.user?.id) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { soundUrl, name } = req.body;
+      
+      if (!soundUrl || !name) {
+        return res.status(400).json({ message: "Missing soundUrl or name" });
+      }
+
+      const customSound = await storage.createCustomSound({
+        userId: req.user.id,
+        soundUrl,
+        name
+      });
+
+      res.json(customSound);
+    } catch (error: any) {
+      console.error("Error creating custom sound:", error);
+      res.status(500).json({ message: "Failed to create custom sound" });
+    }
+  });
+
   // Training data routes
   app.post("/api/training/process", authenticateUser, async (req, res) => {
     try {
@@ -1170,7 +1195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/intent-detect/:chatbotId", async (req: Request, res: Response) => {
     const origin = req.headers.origin?.toString();
-    setCORSHeaders(res, origin);
+    res.setHeader('Access-Control-Allow-Origin', '*');
     try {
       const { message, history, sessionId } = req.body;
       const { chatbotId } = req.params;

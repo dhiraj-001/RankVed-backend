@@ -81,6 +81,7 @@ export interface IStorage {
 
   // Sound management methods
   getCustomSounds(userId: number): Promise<Array<{ id: string; name: string; soundUrl: string; createdAt: Date }>>;
+  createCustomSound(data: { userId: number; soundUrl: string; name: string }): Promise<{ id: string; name: string; soundUrl: string; createdAt: Date }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -467,6 +468,31 @@ export class DatabaseStorage implements IStorage {
         soundUrl: chatbot.soundUrl!,
         createdAt: chatbot.createdAt
       }));
+  }
+
+  async createCustomSound(data: { userId: number; soundUrl: string; name: string }): Promise<{ id: string; name: string; soundUrl: string; createdAt: Date }> {
+    // For now, we'll create a temporary chatbot entry to store the custom sound
+    // This is a workaround since we don't have a dedicated custom sounds table
+    const db = await getDb();
+    
+    // Create a temporary chatbot entry with the custom sound
+    const [chatbot] = await db.insert(chatbots).values({
+      userId: data.userId,
+      name: `Sound: ${data.name}`,
+      aiSystemPrompt: '',
+      welcomeMessage: '',
+      isActive: false, // Keep it inactive since it's just for sound storage
+      customPopupSound: data.soundUrl,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    return {
+      id: chatbot.id,
+      name: data.name,
+      soundUrl: data.soundUrl,
+      createdAt: chatbot.createdAt
+    };
   }
 }
 
