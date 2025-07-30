@@ -241,7 +241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser(userData);
       res.json({ user: { ...user, password: undefined } });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.updateUser(parseInt(req.params.id), updates);
       res.json({ user: { ...user, password: undefined } });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -276,7 +276,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing required onboarding data" });
       }
 
-      const recommendations = await generatePersonalizedRecommendations(onboardingData);
+      // Placeholder for personalized recommendations
+      const recommendations = {
+        businessType: onboardingData.businessType,
+        primaryGoals: onboardingData.primaryGoals,
+        suggestions: [
+          "Set up your first chatbot with basic information",
+          "Configure lead collection fields",
+          "Add training data for better responses"
+        ]
+      };
       res.json(recommendations);
     } catch (error) {
       console.error("Error generating onboarding recommendations:", error);
@@ -357,7 +366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(updatedChatbot);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -534,7 +543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(lead);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -747,7 +756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.log("[Training] Calling generateFlowControlledTrainingData...");
       const result = await generateFlowControlledTrainingData(content);
-      console.log("[Training] Training data generated successfully. Intent:", result.intent_id);
+      console.log("[Training] Training data generated successfully. Items:", result.length);
       res.json(result);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -848,8 +857,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.user.id,
         name,
         nodes,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       });
       res.json(template);
     } catch (error) {
@@ -1199,7 +1206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const intent = await detectIntent(message, chatbotId, history, sessionId);
-      res.json({ intent, sessionId: intent?.sessionId });
+      res.json({ intent, sessionId });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to detect intent" });
     }
@@ -1405,23 +1412,25 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
       }
 
       // Domain validation - check if domain is allowed
-      if (chatbotData.allowedDomains && Array.isArray(chatbotData.allowedDomains) && chatbotData.allowedDomains.length > 0) {
-        try {
-          const allowedDomains = chatbotData.allowedDomains;
-          const currentDomain = domain || '';
-          const isAllowed = allowedDomains.some((allowedDomain: string) => 
-            currentDomain.includes(allowedDomain) || 
-            allowedDomain.includes(currentDomain)
-          );
-          
-          if (!isAllowed) {
-            console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
-            return res.status(403).json({ 
-              error: 'Domain not authorized for this chatbot' 
-            });
+      if (process.env.MODE !== 'development') {
+        if (chatbotData.allowedDomains && Array.isArray(chatbotData.allowedDomains) && chatbotData.allowedDomains.length > 0) {
+          try {
+            const allowedDomains = chatbotData.allowedDomains;
+            const currentDomain = domain || '';
+            const isAllowed = allowedDomains.some((allowedDomain: string) => 
+              currentDomain.includes(allowedDomain) || 
+              allowedDomain.includes(currentDomain)
+            );
+            
+            if (!isAllowed) {
+              console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
+              return res.status(403).json({ 
+                error: 'Domain not authorized for this chatbot' 
+              });
+            }
+          } catch (error) {
+            console.error('Error checking allowed domains:', error instanceof Error ? error.message : 'Unknown error');
           }
-        } catch (error) {
-          console.error('Error checking allowed domains:', error instanceof Error ? error.message : 'Unknown error');
         }
       }
 
@@ -1545,24 +1554,26 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
       const chatbotData = chatbot[0];
 
       // Domain validation - check if domain is allowed
-      if (chatbotData.allowedDomains && Array.isArray(chatbotData.allowedDomains) && chatbotData.allowedDomains.length > 0) {
-        try {
-          const allowedDomains = chatbotData.allowedDomains;
-          const currentDomain = domain || '';
-          const isAllowed = allowedDomains.some((allowedDomain: string) => 
-            currentDomain.includes(allowedDomain) || 
-            allowedDomain.includes(currentDomain)
-          );
-          
-          if (!isAllowed) {
-            console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
-            return res.status(403).json({ 
-              error: 'Domain not authorized for this chatbot' 
-            });
+      if (process.env.MODE !== 'development') {
+        if (chatbotData.allowedDomains && Array.isArray(chatbotData.allowedDomains) && chatbotData.allowedDomains.length > 0) {
+          try {
+            const allowedDomains = chatbotData.allowedDomains;
+            const currentDomain = domain || '';
+            const isAllowed = allowedDomains.some((allowedDomain: string) => 
+              currentDomain.includes(allowedDomain) || 
+              allowedDomain.includes(currentDomain)
+            );
+            
+            if (!isAllowed) {
+              console.warn(`Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
+              return res.status(403).json({ 
+                error: 'Domain not authorized for this chatbot' 
+              });
+            }
+          } catch (error) {
+            console.error('Error checking allowed domains:', error instanceof Error ? error.message : 'Unknown error');
+            // Continue without domain validation if parsing fails
           }
-        } catch (error) {
-          console.error('Error checking allowed domains:', error instanceof Error ? error.message : 'Unknown error');
-          // Continue without domain validation if parsing fails
         }
       }
 
