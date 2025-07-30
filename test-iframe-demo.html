@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RankVed Chatbot Iframe Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .demo-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .demo-section h2 {
+            color: #6366F1;
+            margin-top: 0;
+        }
+        .iframe-container {
+            border: 2px solid #6366F1;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 20px 0;
+            background: white;
+        }
+        .iframe-container iframe {
+            width: 100%;
+            height: 600px;
+            border: none;
+        }
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin: 15px 0;
+        }
+        .instructions {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .warning {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 RankVed Chatbot Iframe Service Demo</h1>
+        
+        <div class="instructions">
+            <strong>📋 Instructions:</strong> This demo shows how to embed a RankVed chatbot using the new iframe service. 
+            Replace <code>YOUR_CHATBOT_ID</code> with your actual chatbot ID.
+        </div>
+
+        <div class="demo-section">
+            <h2>🎯 Basic Iframe Embedding</h2>
+            <p>Embed the chatbot in an iframe with full functionality:</p>
+            
+            <div class="iframe-container">
+                <iframe 
+                    src="/api/iframe/YOUR_CHATBOT_ID" 
+                    title="RankVed Chatbot"
+                    allow="microphone; camera"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups">
+                </iframe>
+            </div>
+
+            <div class="code-block">
+&lt;iframe 
+    src="/api/iframe/YOUR_CHATBOT_ID" 
+    title="RankVed Chatbot"
+    allow="microphone; camera"
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"&gt;
+&lt;/iframe&gt;
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📱 Responsive Iframe Embedding</h2>
+            <p>Responsive iframe that adapts to different screen sizes:</p>
+            
+            <div class="code-block">
+&lt;div style="position: relative; width: 100%; max-width: 400px; height: 600px;"&gt;
+    &lt;iframe 
+        src="/api/iframe/YOUR_CHATBOT_ID" 
+        title="RankVed Chatbot"
+        style="width: 100%; height: 100%; border: none; border-radius: 12px;"
+        allow="microphone; camera"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"&gt;
+    &lt;/iframe&gt;
+&lt;/div&gt;
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🔧 Advanced Configuration</h2>
+            <p>Customize the iframe with specific dimensions and styling:</p>
+            
+            <div class="code-block">
+&lt;!-- Custom styled iframe container --&gt;
+&lt;div style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 350px;
+    height: 500px;
+    z-index: 1000;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+"&gt;
+    &lt;iframe 
+        src="/api/iframe/YOUR_CHATBOT_ID" 
+        title="RankVed Chatbot"
+        style="width: 100%; height: 100%; border: none;"
+        allow="microphone; camera"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"&gt;
+    &lt;/iframe&gt;
+&lt;/div&gt;
+            </div>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ Important Notes:</strong>
+            <ul>
+                <li>Replace <code>YOUR_CHATBOT_ID</code> with your actual chatbot ID</li>
+                <li>The chatbot must be active and the domain must be authorized</li>
+                <li>For production, ensure proper CORS and security headers are configured</li>
+                <li>The iframe service automatically handles domain validation and security</li>
+            </ul>
+        </div>
+
+        <div class="success">
+            <strong>✅ Features of the New Iframe Service:</strong>
+            <ul>
+                <li>🔒 Automatic domain validation and security</li>
+                <li>📱 Responsive design with loading spinner</li>
+                <li>🎨 Full chatbot configuration support</li>
+                <li>🔧 Dynamic URL detection for frontend and backend</li>
+                <li>📊 Comprehensive logging and error handling</li>
+                <li>🛡️ Security headers and CORS support</li>
+            </ul>
+        </div>
+
+        <div class="demo-section">
+            <h2>🔍 Testing the Service</h2>
+            <p>To test the iframe service:</p>
+            
+            <div class="code-block">
+# Test with curl
+curl -X GET "http://localhost:3000/api/iframe/YOUR_CHATBOT_ID" \
+  -H "X-Domain: localhost" \
+  -H "X-Referer: http://localhost:3000"
+
+# Test in browser
+# Navigate to: http://localhost:3000/api/iframe/YOUR_CHATBOT_ID
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📊 Environment Variables</h2>
+            <p>Required environment variables for the iframe service:</p>
+            
+            <div class="code-block">
+# Backend .env
+VITE_API_URL=https://your-backend-domain.com
+FRONTEND_URL=https://your-frontend-domain.com
+
+# Frontend .env  
+VITE_API_URL=https://your-backend-domain.com
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add some interactivity to the demo
+        console.log('🚀 RankVed Chatbot Iframe Demo loaded');
+        console.log('📋 Replace YOUR_CHATBOT_ID with your actual chatbot ID to test');
+        
+        // Add click handlers for code blocks
+        document.querySelectorAll('.code-block').forEach(block => {
+            block.addEventListener('click', () => {
+                const text = block.textContent;
+                navigator.clipboard.writeText(text).then(() => {
+                    const originalText = block.textContent;
+                    block.textContent = '✅ Copied to clipboard!';
+                    setTimeout(() => {
+                        block.textContent = originalText;
+                    }, 2000);
+                });
+            });
+            
+            block.style.cursor = 'pointer';
+            block.title = 'Click to copy code';
+        });
+    </script>
+</body>
+</html> 

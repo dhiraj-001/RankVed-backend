@@ -922,38 +922,246 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.sendFile(path.join(process.cwd(), 'simple-wordpress-test.html'));
   });
 
-  // Minimal HTML page for iframe embedding
-  app.get('/api/iframe/:chatbotId', (req, res) => {
-    res.setHeader('Content-Type', 'text/html');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    const apiUrl = process.env.VITE_API_URL || '';
-    const frontendUrl = process.env.FRONTEND_URL || 'https://your-frontend-url.vercel.app'; // fallback placeholder
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>Chatbot</title>
-        <meta name="viewport" content="width=400, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <link rel="stylesheet" href="${frontendUrl}/chat-embed.css">
-        <style>
-          html, body { height: 100%; margin: 0; padding: 0; background: transparent; }
-          body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  // New iframe service route for chatbot embedding
+  app.get('/api/iframe/:chatbotId', async (req, res) => {
+    try {
+      const { chatbotId } = req.params;
+      const domain = req.headers['x-domain'] || req.headers.origin;
+      const referer = req.headers['x-referer'] || req.headers.referer;
+
+      console.log(`[Iframe Service] Request received for chatbot: ${chatbotId}`);
+      console.log(`[Iframe Service] Domain: ${domain}, Referer: ${referer}`);
+      console.log(`[Iframe Service] Mode: ${process.env.MODE}, Development bypass: ${process.env.MODE === 'development'}`);
+
+      // Get chatbot from database
+      const db = await getDb();
+      const chatbot = await db.select()
+        .from(chatbots)
+        .where(eq(chatbots.id, chatbotId))
+        .limit(1);
+
+      if (chatbot.length === 0) {
+        console.warn(`[Iframe Service] Chatbot not found: ${chatbotId}`);
+        return res.status(404).send(`
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>Chatbot Not Found</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; margin: 0; }
+              .error { color: #e53e3e; }
+            </style>
+          </head>
+          <body>
+            <h2 class="error">Chatbot Not Found</h2>
+            <p>The requested chatbot is not available.</p>
+          </body>
+          </html>
+        `);
+      }
+
+      const chatbotData = chatbot[0];
+
+      // Check if chatbot is active
+      if (!chatbotData.isActive) {
+        console.warn(`[Iframe Service] Chatbot inactive: ${chatbotId}`);
+        return res.status(403).send(`
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>Chatbot Inactive</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; margin: 0; }
+              .error { color: #e53e3e; }
+            </style>
+          </head>
+          <body>
+            <h2 class="error">Chatbot Inactive</h2>
+            <p>This chatbot is currently not active.</p>
+          </body>
+          </html>
+        `);
+      }
+
+      // Domain validation - check if domain is allowed
+      if (process.env.MODE !== 'development') {
+        if (chatbotData.allowedDomains && Array.isArray(chatbotData.allowedDomains) && chatbotData.allowedDomains.length > 0) {
+          try {
+            const allowedDomains = chatbotData.allowedDomains;
+            const currentDomain = domain || '';
+            const isAllowed = allowedDomains.some((allowedDomain: string) => 
+              currentDomain.includes(allowedDomain) || 
+              allowedDomain.includes(currentDomain)
+            );
             
-        </style>
-      </head>
-      <body>
-        <div id="chatbot-widget-container"></div>
-        <script>
-          window.CHATBOT_CONFIG = {
-            chatbotId: "${req.params.chatbotId}",
-            apiUrl: "${apiUrl}"
-          };
-        </script>
-        <script src="${frontendUrl}/chat-embed.js"></script>
-      </body>
-      </html>
-    `);
+            if (!isAllowed) {
+              console.warn(`[Iframe Service] Domain access denied: ${currentDomain} for chatbot ${chatbotId}`);
+              return res.status(403).send(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="UTF-8">
+                  <title>Access Denied</title>
+                  <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; margin: 0; }
+                    .error { color: #e53e3e; }
+                  </style>
+                </head>
+                <body>
+                  <h2 class="error">Access Denied</h2>
+                  <p>This domain is not authorized to use this chatbot.</p>
+                </body>
+                </html>
+              `);
+            }
+          } catch (error) {
+            console.error('[Iframe Service] Error checking allowed domains:', error instanceof Error ? error.message : 'Unknown error');
+          }
+        }
+      }
+
+      // Determine URLs
+      const apiUrl = process.env.VITE_API_URL || req.protocol + '://' + req.get('host');
+      const frontendUrl = process.env.FRONTEND_URL || req.protocol + '://' + req.get('host');
+
+      console.log(`[Iframe Service] Serving iframe for chatbot: ${chatbotId}`);
+      console.log(`[Iframe Service] API URL: ${apiUrl}`);
+      console.log(`[Iframe Service] Frontend URL: ${frontendUrl}`);
+
+      // Set headers
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('X-Frame-Options', 'ALLOWALL');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+
+      // Generate the iframe HTML
+      const iframeHtml = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <title>${chatbotData.name || 'Chatbot'}</title>
+          <style>
+            html, body { 
+              height: 100%; 
+              margin: 0; 
+              padding: 0; 
+              background: transparent; 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              overflow: hidden;
+            }
+            body { 
+              display: flex; 
+              align-items: flex-start; 
+              justify-content: flex-start; 
+              height: 100%; 
+            }
+            #rankved-chatbot-container {
+              width: 100%;
+              height: 100%;
+              max-width: 400px;
+              max-height: 600px;
+            }
+            .spinner {
+              border: 2px solid #f3f3f3;
+              border-top: 2px solid #6366F1;
+              border-radius: 50%;
+              width: 20px;
+              height: 20px;
+              animation: spin 1s linear infinite;
+              margin-right: 10px;
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          </style>
+        </head>
+        <body>
+        
+          
+          <script>
+            // Global configuration for the chatbot
+            window.RankVedChatbotConfig = {
+              chatbotId: "${chatbotData.id}",
+              apiUrl: "${apiUrl}",
+              frontendUrl: "${frontendUrl}",
+              name: "${(chatbotData.name || '').replace(/"/g, '\\"')}",
+              primaryColor: "${chatbotData.primaryColor || '#6366F1'}",
+              welcomeMessage: "${(chatbotData.welcomeMessage || 'Hello! How can I help you today?').replace(/"/g, '\\"')}",
+              inputPlaceholder: "${(chatbotData.inputPlaceholder || 'Type your message...').replace(/"/g, '\\"')}",
+              chatBubbleIcon: "${chatbotData.chatBubbleIcon || ''}",
+              chatWindowAvatar: "${chatbotData.chatWindowAvatar || ''}",
+              chatWidgetIcon: "${chatbotData.chatWidgetIcon || ''}",
+              chatWidgetName: "${(chatbotData.chatWidgetName || 'Support Chat').replace(/"/g, '\\"')}",
+              poweredByText: "${(chatbotData.poweredByText || 'Powered by RankVed').replace(/"/g, '\\"')}",
+              poweredByLink: "${chatbotData.poweredByLink || '#'}",
+              leadCollectionEnabled: ${chatbotData.leadCollectionEnabled !== false},
+              leadCollectionFields: ${JSON.stringify(chatbotData.leadCollectionFields || ['name', 'phone'])},
+              popupSoundEnabled: ${chatbotData.popupSoundEnabled !== false},
+              customPopupSound: "${chatbotData.customPopupSound || ''}",
+              popupSoundVolume: ${chatbotData.popupSoundVolume || 50},
+              popupDelay: ${chatbotData.popupDelay || 2000},
+              replyDelay: ${chatbotData.replyDelay || 1000},
+              bubblePosition: "${chatbotData.bubblePosition || 'bottom-right'}",
+              horizontalOffset: ${chatbotData.horizontalOffset || 20},
+              verticalOffset: ${chatbotData.verticalOffset || 20},
+              title: "${(chatbotData.title || 'Chat with us').replace(/"/g, '\\"')}",
+              showWelcomePopup: ${chatbotData.showWelcomePopup !== false},
+              suggestionButtons: ${chatbotData.suggestionButtons ? chatbotData.suggestionButtons : '[]'},
+              leadButtonText: "${(chatbotData.leadButtonText || 'Get Started').replace(/"/g, '\\"')}",
+              whatsapp: "${chatbotData.whatsapp || ''}",
+              email: "${chatbotData.email || ''}",
+              phone: "${chatbotData.phone || ''}",
+              website: "${chatbotData.website || ''}",
+              chatWindowStyle: "${chatbotData.chatWindowStyle || 'modern'}",
+              chatWindowTheme: "${chatbotData.chatWindowTheme || 'light'}",
+              borderRadius: ${chatbotData.borderRadius || 16},
+              shadowStyle: "${chatbotData.shadowStyle || 'soft'}",
+              isActive: ${chatbotData.isActive}
+            };
+
+            // Domain and referer information
+            window.CHATBOT_DOMAIN = "${domain || ''}";
+            window.CHATBOT_REFERER = "${referer || ''}";
+
+            console.log('[Iframe] RankVed Chatbot Config:', window.RankVedChatbotConfig);
+            console.log('[Iframe] Domain:', window.CHATBOT_DOMAIN);
+            console.log('[Iframe] Referer:', window.CHATBOT_REFERER);
+          </script>
+          
+          <!-- Load the chatbot loader script -->
+          <script src="${frontendUrl}/chatbot-loader.js"></script>
+        </body>
+        </html>
+      `;
+
+      res.send(iframeHtml);
+
+    } catch (error) {
+      console.error('[Iframe Service] Error:', error);
+      res.status(500).send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <title>Error</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; margin: 0; }
+            .error { color: #e53e3e; }
+          </style>
+        </head>
+        <body>
+          <h2 class="error">Error Loading Chatbot</h2>
+          <p>There was an error loading the chatbot interface.</p>
+          <p>Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+        </body>
+        </html>
+      `);
+    }
   });
 
 

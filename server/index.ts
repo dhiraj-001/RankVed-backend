@@ -29,6 +29,7 @@ app.use((req, res, next) => {
     req.originalUrl.match(/^\/api\/chat\/[\w-]+\/message$/) ||
     req.originalUrl.match(/^\/api\/chat\/[\w-]+\/leads$/) ||
     req.originalUrl.match(/^\/api\/chatbot\/[\w-]+\/config$/) ||
+    req.originalUrl.match(/^\/api\/iframe\/[\w-]+$/) ||
     req.originalUrl.match(/^\/api\/chat$/);
 
   console.log(`[CORS] Request: ${req.method} ${req.originalUrl} | Origin: ${origin} | Public: ${isPublicWidgetEndpoint}`);
