@@ -411,7 +411,7 @@ Based on the user's intent "${detectedIntentLabel}", and the message "${message}
 - If there are any important keywords, actions, or values, highlight them using double asterisks (e.g., **important**).
 - Try to avoid answering in paragraphs; use the most direct and clear format for the answer.always use line breaks to make it more readable.
 - Use the following as a reference for your answer: "${relevantTrainingData.default_response_text}". Do not copy the default response text. Change it to a dynamic and natural response.
-${followUpSummary}. do not list the follow up options in your response.
+${followUpSummary}. do not list the follow up options in your response.no need to write the cta button links in your response.
 
 Here is the chatbot's training data for your reference:
 ${plainTrainingData}
