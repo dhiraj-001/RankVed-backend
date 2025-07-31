@@ -43,6 +43,13 @@
       "when": 1753628403785,
       "tag": "0005_typical_shiver_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1753921505248,
+      "tag": "0006_majestic_pyro",
+      "breakpoints": true
     }
   ]
 }

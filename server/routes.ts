@@ -349,6 +349,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Only allow updates for fields present in the schema
       const updates = insertChatbotSchema.partial().parse(req.body);
+      
+      // Debug lead collection fields updates
+      if (updates.leadCollectionFields !== undefined) {
+        console.log('[Backend] Received leadCollectionFields update:', {
+          chatbotId: req.params.id,
+          leadCollectionFields: updates.leadCollectionFields,
+          type: typeof updates.leadCollectionFields,
+          isArray: Array.isArray(updates.leadCollectionFields)
+        });
+      }
+      
       // Only log fields that are in the schema
       if (updates.trainingData !== undefined) {
         console.log('[Backend] Received trainingData for save:', updates.trainingData);
@@ -356,8 +367,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updates.plainData !== undefined) {
         console.log('[Backend] Received plainData for save:', updates.plainData);
       }
+      
       // No logging or handling for non-schema fields
       const updatedChatbot = await storage.updateChatbot(req.params.id, updates);
+      
+      if (updates.leadCollectionFields !== undefined) {
+        console.log('[Backend] Lead collection fields saved to DB for chatbot', req.params.id);
+      }
       if (updates.trainingData !== undefined) {
         console.log('[Backend] Training data saved to DB for chatbot', req.params.id);
       }
@@ -385,12 +401,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get lead collection fields for a chatbot
-  app.get("/api/chatbots/:id/lead-fields", async (req, res) => {
+  app.get("/api/chatbots/:id/lead-fields", authenticateUser, async (req, res) => {
     try {
       const chatbot = await storage.getChatbot(req.params.id);
-      if (!chatbot || !chatbot.isActive) {
-        return res.status(404).json({ message: "Chatbot not found or inactive" });
+      if (!chatbot || chatbot.userId !== req.user.id) {
+        return res.status(404).json({ message: "Chatbot not found" });
       }
+      
+      console.log('[Backend] Lead fields from DB:', {
+        chatbotId: chatbot.id,
+        leadCollectionEnabled: chatbot.leadCollectionEnabled,
+        leadCollectionFields: chatbot.leadCollectionFields,
+        leadCollectionFieldsType: typeof chatbot.leadCollectionFields,
+        isArray: Array.isArray(chatbot.leadCollectionFields)
+      });
       
       res.json({
         leadCollectionEnabled: chatbot.leadCollectionEnabled,
@@ -748,14 +772,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Body (JSON): { "content": "Your university info here..." }
   app.post("/api/training/generate", authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { content } = req.body;
-      console.log(`[Training] Request received from user: ${req.user?.email || req.user?.id}, content length: ${content?.length}`);
+      const { content, chatbotId } = req.body;
+      console.log(`[Training] Request received from user: ${req.user?.email || req.user?.id}, content length: ${content?.length}, chatbotId: ${chatbotId}`);
       if (!content || typeof content !== "string") {
         console.log("[Training] Invalid or missing content in request body");
         return res.status(400).json({ message: "Missing or invalid 'content' in request body" });
       }
+      if (!chatbotId || typeof chatbotId !== "string") {
+        console.log("[Training] Invalid or missing chatbotId in request body");
+        return res.status(400).json({ message: "Missing or invalid 'chatbotId' in request body" });
+      }
       console.log("[Training] Calling generateFlowControlledTrainingData...");
-      const result = await generateFlowControlledTrainingData(content);
+      const result = await generateFlowControlledTrainingData(content, chatbotId);
       console.log("[Training] Training data generated successfully. Items:", result.length);
       res.json(result);
     } catch (error) {

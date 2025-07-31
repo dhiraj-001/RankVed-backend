@@ -2,24 +2,53 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { GoogleGenAI } from '@google/genai';
-import { TrainingDataItem, FollowUpOption } from './data';
-import { getChatbotById } from '../storage';
+import { FollowUpOption } from './data';
+import { storage } from '../storage';
+
+interface TrainingDataItem {
+  intent_id: string;
+  nlp_training_phrases: string[];
+  default_response_text: string;
+  follow_up_options: FollowUpOption[];
+  cta_button_text: string | null;
+  cta_button_link: string | null;
+  collect_contact_info: boolean;
+  lead: boolean;
+}
 
 /**
  * Generates flow-controlled training data using Gemini API.
  * @param plainTextContent - The input text to extract intents from.
+ * @param chatbotId - The chatbot ID to fetch contact information from.
  * @param apiKey - (Optional) Gemini API key. If not provided, uses process.env.TRAIN_API_KEY.
  * @returns Parsed TrainingDataItem object.
  */
 export async function generateFlowControlledTrainingData(
   plainTextContent: string,
+  chatbotId: string,
   apiKey?: string
 ): Promise<TrainingDataItem[]> {
   const key = apiKey || process.env.TRAIN_API_KEY;
   if (!key) throw new Error('Gemini API key not found in env or argument');
   const ai = new GoogleGenAI({ apiKey: String(key) });
 
+  // Fetch chatbot contact information from database
+  const chatbot = await storage.getChatbot(chatbotId);
+  if (!chatbot) {
+    throw new Error('Chatbot not found');
+  }
+
+  const whatsapp = chatbot.whatsapp || '';
+  const phone = chatbot.phone || '';
+  const website = chatbot.website || '';
+
   console.log('[Training] Gemini training request started. Content length:', plainTextContent.length);
+  console.log('[Training] Using contact info - WhatsApp:', whatsapp, 'Phone:', phone, 'Website:', website);
+
+  // Build WhatsApp link
+  const whatsappLink = whatsapp 
+    ? `https://wa.me/${whatsapp.replace(/\D/g, '')}?text=Hello%2C%20I%20have%20a%20question%20about%20[INTENT_NAME_HERE].`
+    : 'https://wa.me/your-number?text=Hello%2C%20I%20have%20a%20question%20about%20[INTENT_NAME_HERE].';
 
   const prompt = `
 You are an AI assistant specialized in designing interconnected chatbot conversational flows for any business or organization. Your task is to analyze the provided set of related text snippets and transform them into a LIST of structured JSON objects (TrainingDataItem).
@@ -29,8 +58,9 @@ Your primary goal is to create a set of chatbot flows that are:
 2.  Concise Flows: Each logical flow should aim for 2-4 conversational turns, strictly never exceeding 5 turns.
 3.  Goal-Oriented: Each flow should lead to an answer, a specific resource, or direct contact.
 4.  **CUSTOMER-CENTRIC DIRECT CONTACT (WhatsApp Priority):** After 2-3 turns within a flow, or whenever a user might need more specific human interaction, **ALWAYS prioritize including a CTA button or follow-up option for "Chat on WhatsApp" or "Call Us Directly".** This ensures users can always easily get direct support and maximizes lead generation. **Use WhatsApp CTAs prominently in MOST relevant places, rather than just relying on generic website links.**
-    -   WhatsApp link format: https://wa.me/+919780355355?text=Hello%20Gulmohar%20IVF%2C%20I%20have%20a%20question%20about%20[INTENT_NAME_HERE].
-    -   Phone number: +91 97803 55355.
+    -   WhatsApp link format: ${whatsappLink}
+    -   Phone number: ${phone || 'your-phone-number'}.
+    -   Website: ${website || 'your-website-url'}.
 5.  Properly Ended: Flows should gracefully conclude either by providing final information, directing to a specific external resource (with a relevant CTA), or offering direct contact options.
 6.  Interconnectedness: Identify logical connections between the intents derived from different text snippets. Use associated_intent_id in follow_up_options to create these links.
 7.  **COMPREHENSIVE COVERAGE: Extract EVERY possible topic, subtopic, question, and concept from the input text. Do not miss ANY detail, no matter how small, to ensure robust question flows.**
@@ -46,24 +76,24 @@ Your primary goal is to create a set of chatbot flows that are:
     -   Support intent (What kind of support is offered for X?)
     -   Contact intent
     -   FAQ intent (even if not explicitly listed, anticipate common questions and create dedicated FAQ intents for sub-topics)
-10. **Follow-up Option Text (Extremely Small):** Keep all `option_text` in `follow_up_options` as short as possible (1-3 words, clear and direct).
-11. **IMPORTANT CTA RULE:** For any main action or external link, ALWAYS use the `cta_button_text` and `cta_button_link` fields. Do NOT place these as `follow_up_options`. Only use `follow_up_options` for intent navigation or secondary actions that do not involve external links or main CTAs.
+10. **Follow-up Option Text (Extremely Small):** Keep all option_text in follow_up_options as short as possible (1-3 words, clear and direct).
+11. **IMPORTANT CTA RULE:** For any main action or external link, ALWAYS use the cta_button_text and cta_button_link fields. Do NOT place these as follow_up_options. Only use follow_up_options for intent navigation or secondary actions that do not involve external links or main CTAs.
 12. **LEAD FIELD REQUIREMENT:** For each TrainingDataItem, include a boolean field 'lead'. Set 'lead: true' for any intent where collecting a lead is relevant (such as contact, pricing, booking, demo, callback, quote, or any intent where the user is likely to provide their contact information or request a callback/quote). Set 'lead: false' for all other intents. This field is required in every TrainingDataItem.
 
 Instructions for generating each TrainingDataItem in the list:
 -   **INTENT CREATION STRATEGY: Derive intent_id from EVERY distinct topic, subtopic, question, and concept in the provided text. Be extremely thorough and granular in breaking down information, aiming for the maximum possible flows.**
--   Generate `nlp_training_phrases`: At least 5-8 realistic user queries for each intent. Include variations, synonyms, and different ways users might ask the same question.
--   Craft `default_response_text`: A concise, 1-2 sentence bot message. Don't make it too long.
--   Populate `follow_up_options`:
-    -   **GREETING INTENTS:** MUST have 3-4 `follow_up_options`. These are critical entry points and must provide clear navigation.
+-   Generate nlp_training_phrases: At least 5-8 realistic user queries for each intent. Include variations, synonyms, and different ways users might ask the same question.
+-   Craft default_response_text: A concise, 1-2 sentence bot message. Don't make it too long.
+-   Populate follow_up_options:
+    -   **GREETING INTENTS:** MUST have 3-4 follow_up_options. These are critical entry points and must provide clear navigation.
     -   **OTHER INTENTS:** Generate 2-4 options. Prioritize leading to more specific (connected) intents or to direct contact.
-    -   Use `associated_intent_id` to link to other intents derived from these or other provided texts.
-    -   Do NOT use `cta_button_text` or `cta_button_link` in `follow_up_options`. Only use these for the main CTA button.
-    -   Set `collect_contact_info`: true when asking for user contact details.
-    -   **All `option_text` must be as short as possible (1-3 words).**
--   Populate `cta_button_text` and `cta_button_link` for the main intent: The primary call to action for this intent's response. **Prioritize WhatsApp/Call for concluding or escalating points and for most relevant CTAs, especially for lead generation.**
--   `collect_contact_info` (at intent level): Set this to true ONLY for intents like "connect_to_human" where the primary purpose is to collect user contact details immediately.
--   `lead` (at intent level): This boolean field must be present in every `TrainingDataItem`. Set 'lead: true' for intents where lead collection is relevant (contact, pricing, booking, demo, callback, quote, etc.), and 'lead: false' for all others.
+    -   Use associated_intent_id to link to other intents derived from these or other provided texts.
+    -   Do NOT use cta_button_text or cta_button_link in follow_up_options. Only use these for the main CTA button.
+    -   Set collect_contact_info: true when asking for user contact details.
+    -   **All option_text must be as short as possible (1-3 words).**
+-   Populate cta_button_text and cta_button_link for the main intent: The primary call to action for this intent's response. **Prioritize WhatsApp/Call for concluding or escalating points and for most relevant CTAs, especially for lead generation.**
+-   collect_contact_info (at intent level): Set this to true ONLY for intents like "connect_to_human" where the primary purpose is to collect user contact details immediately.
+-   lead (at intent level): This boolean field must be present in every TrainingDataItem. Set 'lead: true' for intents where lead collection is relevant (contact, pricing, booking, demo, callback, quote, etc.), and 'lead: false' for all others.
 
 ---
 **CRITICAL REQUIREMENT:** You MUST generate **AT LEAST 40-70 TrainingDataItem objects.** If the input content is substantial, aim for **50-70 intents.** Be **extremely thorough and comprehensive** in your analysis, breaking down **EVERY piece of information into a distinct, navigable intent.**
