@@ -78,7 +78,7 @@ Your primary goal is to create a set of chatbot flows that are:
     -   FAQ intent (even if not explicitly listed, anticipate common questions and create dedicated FAQ intents for sub-topics)
 10. **Follow-up Option Text (Extremely Small):** Keep all option_text in follow_up_options as short as possible (1-3 words, clear and direct).
 11. **IMPORTANT CTA RULE:** For any main action or external link, ALWAYS use the cta_button_text and cta_button_link fields. Do NOT place these as follow_up_options. Only use follow_up_options for intent navigation or secondary actions that do not involve external links or main CTAs.
-12. **LEAD FIELD REQUIREMENT:** For each TrainingDataItem, include a boolean field 'lead'. Set 'lead: true' for any intent where collecting a lead is relevant (such as contact, pricing, booking, demo, callback, quote, or any intent where the user is likely to provide their contact information or request a callback/quote). Set 'lead: false' for all other intents. This field is required in every TrainingDataItem.
+12. **LEAD FIELD REQUIREMENT:** For each TrainingDataItem, include a boolean field lead. Set lead: true for any intent where collecting a lead is relevant (such as contact, pricing, booking, demo, callback, quote, or any intent where the user is likely to provide their contact information or request a callback/quote). Set lead: false for all other intents. This field is required in every TrainingDataItem.
 
 Instructions for generating each TrainingDataItem in the list:
 -   **INTENT CREATION STRATEGY: Derive intent_id from EVERY distinct topic, subtopic, question, and concept in the provided text. Be extremely thorough and granular in breaking down information, aiming for the maximum possible flows.**
@@ -92,8 +92,8 @@ Instructions for generating each TrainingDataItem in the list:
     -   Set collect_contact_info: true when asking for user contact details.
     -   **All option_text must be as short as possible (1-3 words).**
 -   Populate cta_button_text and cta_button_link for the main intent: The primary call to action for this intent's response. **Prioritize WhatsApp/Call for concluding or escalating points and for most relevant CTAs, especially for lead generation.**
--   collect_contact_info (at intent level): Set this to true ONLY for intents like "connect_to_human" where the primary purpose is to collect user contact details immediately.
--   lead (at intent level): This boolean field must be present in every TrainingDataItem. Set 'lead: true' for intents where lead collection is relevant (contact, pricing, booking, demo, callback, quote, etc.), and 'lead: false' for all others.
+-   collect_contact_info (at intent level): Set this to true ONLY for intents like connect_to_human where the primary purpose is to collect user contact details immediately.
+-   lead (at intent level): This boolean field must be present in every TrainingDataItem. Set lead: true for intents where lead collection is relevant (contact, pricing, booking, demo, callback, quote, etc.), and lead: false for all others.
 
 ---
 **CRITICAL REQUIREMENT:** You MUST generate **AT LEAST 40-70 TrainingDataItem objects.** If the input content is substantial, aim for **50-70 intents.** Be **extremely thorough and comprehensive** in your analysis, breaking down **EVERY piece of information into a distinct, navigable intent.**
