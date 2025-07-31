@@ -2,26 +2,50 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { GoogleGenAI } from '@google/genai';
-import { FollowUpOption } from './data';
-import { storage } from '../storage';
+// Assuming `storage` is correctly configured elsewhere to fetch chatbot data.
+// import { storage } from '../storage';
 
-interface TrainingDataItem {
+// --- MOCK STORAGE FOR STANDALONE TESTING ---
+// Replace this with your actual storage import.
+const storage = {
+  getChatbot: async (chatbotId: string) => {
+    console.log(`[Mock Storage] Fetching chatbot with ID: ${chatbotId}`);
+    // Return mock data for the example to work
+    return {
+      id: chatbotId,
+      whatsapp: '+15550123456',
+      phone: '+1-555-012-3456',
+      website: 'https://www.techcorp.com',
+    };
+  },
+};
+// --- END MOCK ---
+
+// Refined interfaces for clarity and alignment with JSON structure
+export interface FollowUpOption {
+  option_text: string;
+  associated_intent_id: string;
+  collect_contact_info?: boolean;
+}
+
+export interface TrainingDataItem {
   intent_id: string;
   nlp_training_phrases: string[];
   default_response_text: string;
-  follow_up_options: FollowUpOption[];
-  cta_button_text: string | null;
-  cta_button_link: string | null;
-  collect_contact_info: boolean;
   lead: boolean;
+  follow_up_options?: FollowUpOption[];
+  cta_button_text?: string;
+  cta_button_link?: string;
+  collect_contact_info?: boolean;
 }
+
 
 /**
  * Generates flow-controlled training data using Gemini API.
  * @param plainTextContent - The input text to extract intents from.
  * @param chatbotId - The chatbot ID to fetch contact information from.
  * @param apiKey - (Optional) Gemini API key. If not provided, uses process.env.TRAIN_API_KEY.
- * @returns Parsed TrainingDataItem object.
+ * @returns Parsed TrainingDataItem array.
  */
 export async function generateFlowControlledTrainingData(
   plainTextContent: string,
@@ -30,12 +54,11 @@ export async function generateFlowControlledTrainingData(
 ): Promise<TrainingDataItem[]> {
   const key = apiKey || process.env.TRAIN_API_KEY;
   if (!key) throw new Error('Gemini API key not found in env or argument');
-  const ai = new GoogleGenAI({ apiKey: String(key) });
 
-  // Fetch chatbot contact information from database
+  // Fetch chatbot contact information from the database
   const chatbot = await storage.getChatbot(chatbotId);
   if (!chatbot) {
-    throw new Error('Chatbot not found');
+    throw new Error(`Chatbot with ID "${chatbotId}" not found`);
   }
 
   const whatsapp = chatbot.whatsapp || '';
@@ -45,76 +68,92 @@ export async function generateFlowControlledTrainingData(
   console.log('[Training] Gemini training request started. Content length:', plainTextContent.length);
   console.log('[Training] Using contact info - WhatsApp:', whatsapp, 'Phone:', phone, 'Website:', website);
 
-  // Build WhatsApp link
-  const whatsappLink = whatsapp 
-    ? `https://wa.me/${whatsapp.replace(/\D/g, '')}?text=Hello%2C%20I%20have%20a%20question%20about%20[INTENT_NAME_HERE].`
-    : 'https://wa.me/your-number?text=Hello%2C%20I%20have%20a%20question%20about%20[INTENT_NAME_HERE].';
+  // Build a robust WhatsApp link
+  const whatsappLink = whatsapp
+    ? `https://wa.me/${whatsapp.replace(/\D/g, '')}?text=Hello%2C%20I%20have%20a%20question.`
+    : '';
 
   const prompt = `
-You are an AI assistant specialized in designing interconnected chatbot conversational flows for any business or organization. Your task is to analyze the provided set of related text snippets and transform them into a LIST of structured JSON objects (TrainingDataItem).
-
-Your primary goal is to create a set of chatbot flows that are:
-1.  **MAXIMUM DATA GENERATION & GRANULARITY:** Generate **AT LEAST 40-70 distinct intents** from the provided content. **Break down EVERY single topic, subtopic, concept, keyword, and potential question into its own separate intent, no matter how small or specific.** Be **extremely thorough and exhaustive** in identifying and creating intents for every piece of information. **Aim to create as many unique, deep conversational flows as humanly possible, exploring every logical branch.**
-2.  Concise Flows: Each logical flow should aim for 2-4 conversational turns, strictly never exceeding 5 turns.
-3.  Goal-Oriented: Each flow should lead to an answer, a specific resource, or direct contact.
-4.  **CUSTOMER-CENTRIC DIRECT CONTACT (WhatsApp Priority):** After 2-3 turns within a flow, or whenever a user might need more specific human interaction, **ALWAYS prioritize including a CTA button or follow-up option for "Chat on WhatsApp" or "Call Us Directly".** This ensures users can always easily get direct support and maximizes lead generation. **Use WhatsApp CTAs prominently in MOST relevant places, rather than just relying on generic website links.**
-    -   WhatsApp link format: ${whatsappLink}
-    -   Phone number: ${phone || 'your-phone-number'}.
-    -   Website: ${website || 'your-website-url'}.
-5.  Properly Ended: Flows should gracefully conclude either by providing final information, directing to a specific external resource (with a relevant CTA), or offering direct contact options.
-6.  Interconnectedness: Identify logical connections between the intents derived from different text snippets. Use associated_intent_id in follow_up_options to create these links.
-7.  **COMPREHENSIVE COVERAGE: Extract EVERY possible topic, subtopic, question, and concept from the input text. Do not miss ANY detail, no matter how small, to ensure robust question flows.**
-8.  **CRITICAL GREETING RULE:** Always include basic intents such as greetings (hello, hi), goodbyes (bye, goodbye), and similar common conversational intents, even if not present in the input. **MOST IMPORTANTLY:** Every greeting intent MUST have at least 3-4 follow_up_options. Greeting intents are the entry point to conversations and must provide clear navigation paths for users. Never leave a greeting intent without follow-up options.
-9.  **DETAILED BREAKDOWN: For each major topic, create multiple specific intents, exploring all possible user questions:**
-    -   General overview intent
-    -   Specific details intent (e.g., What are the features of X? What are the specifics of Y?)
-    -   Requirements intent (e.g., What do I need for X? Are there any prerequisites for Y?)
-    -   Process intent (e.g., How does X work? What is the step-by-step process for Y?)
-    -   Benefits intent (e.g., What are the advantages of X? How will Y help my business?)
-    -   Pricing/Cost intent (if applicable)
-    -   Integration intent (How does X integrate with Y?)
-    -   Support intent (What kind of support is offered for X?)
-    -   Contact intent
-    -   FAQ intent (even if not explicitly listed, anticipate common questions and create dedicated FAQ intents for sub-topics)
-10. **Follow-up Option Text (Extremely Small):** Keep all option_text in follow_up_options as short as possible (1-3 words, clear and direct).
-11. **IMPORTANT CTA RULE:** For any main action or external link, ALWAYS use the cta_button_text and cta_button_link fields. Do NOT place these as follow_up_options. Only use follow_up_options for intent navigation or secondary actions that do not involve external links or main CTAs.
-12. **LEAD FIELD REQUIREMENT:** For each TrainingDataItem, include a boolean field lead. Set lead: true for any intent where collecting a lead is relevant (such as contact, pricing, booking, demo, callback, quote, or any intent where the user is likely to provide their contact information or request a callback/quote). Set lead: false for all other intents. This field is required in every TrainingDataItem.
-
-Instructions for generating each TrainingDataItem in the list:
--   **INTENT CREATION STRATEGY: Derive intent_id from EVERY distinct topic, subtopic, question, and concept in the provided text. Be extremely thorough and granular in breaking down information, aiming for the maximum possible flows.**
--   Generate nlp_training_phrases: At least 5-8 realistic user queries for each intent. Include variations, synonyms, and different ways users might ask the same question.
--   Craft default_response_text: A concise, 1-2 sentence bot message. Don't make it too long.
--   Populate follow_up_options:
-    -   **GREETING INTENTS:** MUST have 3-4 follow_up_options. These are critical entry points and must provide clear navigation.
-    -   **OTHER INTENTS:** Generate 2-4 options. Prioritize leading to more specific (connected) intents or to direct contact.
-    -   Use associated_intent_id to link to other intents derived from these or other provided texts.
-    -   Do NOT use cta_button_text or cta_button_link in follow_up_options. Only use these for the main CTA button.
-    -   Set collect_contact_info: true when asking for user contact details.
-    -   **All option_text must be as short as possible (1-3 words).**
--   Populate cta_button_text and cta_button_link for the main intent: The primary call to action for this intent's response. **Prioritize WhatsApp/Call for concluding or escalating points and for most relevant CTAs, especially for lead generation.**
--   collect_contact_info (at intent level): Set this to true ONLY for intents like connect_to_human where the primary purpose is to collect user contact details immediately.
--   lead (at intent level): This boolean field must be present in every TrainingDataItem. Set lead: true for intents where lead collection is relevant (contact, pricing, booking, demo, callback, quote, etc.), and lead: false for all others.
+You are an expert conversational AI designer. Your SOLE task is to analyze the provided text and deconstruct it into a hyper-granular, interconnected set of chatbot flows in a JSON list format (TrainingDataItem).
 
 ---
-**CRITICAL REQUIREMENT:** You MUST generate **AT LEAST 40-70 TrainingDataItem objects.** If the input content is substantial, aim for **50-70 intents.** Be **extremely thorough and comprehensive** in your analysis, breaking down **EVERY piece of information into a distinct, navigable intent.**
+**CORE DIRECTIVES**
+---
 
-Output ONLY a valid JSON array of TrainingDataItem objects, no extra text or explanation.
-
-Example Input (for few-shot learning - use a simpler, connected example):
-Paragraph A: TechCorp Solutions offers a wide range of software services including Web Development, Mobile Apps, and Cloud Solutions. Our project process requires an initial consultation and setup fee of $500.
-Paragraph B: Our Web Development service focuses on modern frameworks, responsive design, and SEO optimization. It's a comprehensive package with pricing starting at $2,000 per project.
-Paragraph C: We offer maintenance packages for ongoing support and have a dedicated customer success team. Contact us at info@techcorp.com or call +1 555-0123.
+1.  **MAXIMUM GRANULARITY (PRIMARY OBJECTIVE):** Your main goal is to generate **AT LEAST 40-70 distinct intents**. You MUST break down EVERY single topic, subtopic, concept, feature, benefit, process step, and potential question into its own separate intent. Be surgically precise and exhaustive.
+2.  **DETAILED BREAKDOWN STRATEGY:** For EACH topic found in the text, you MUST generate multiple specific intents covering all angles: Overview, Process, Benefits, Cost, Requirements, FAQs, etc.
+3.  **CUSTOMER-CENTRIC DIRECT CONTACT:** After 2-3 conversational turns, or whenever a user needs specific help, ALWAYS provide a CTA button or follow-up option to connect with a human. Use the specific contact details provided below.
+    -   **WhatsApp Link:** ${whatsappLink || 'N/A'}
+    -   **Phone Number:** ${phone || 'N/A'}
+    -   **Website:** ${website || 'N/A'}
+4.  **CRITICAL GREETING RULE:** You MUST include a 'greeting' intent. It is the main entry point and MUST have at least 3-4 \`follow_up_options\` to guide the user immediately.
+5.  **CRITICAL END-OF-FLOW RULE:** Every conversational path must have a definitive conclusion. If an intent is at the end of a topic, its \`follow_up_options\` **MUST** include conclusive options like "Chat on WhatsApp", "Speak to an Expert", or "Ask another question" (linking to the 'greeting' intent). **Never leave a user at a dead end.**
 
 ---
-Input Text (Provide multiple related paragraphs here):
+**JSON STRUCTURE RULES**
+---
+
+-   **\`intent_id\`**: A unique, descriptive ID (e.g., 'ivf_process_steps').
+-   **\`nlp_training_phrases\`**: 5-8 diverse user queries.
+-   **\`default_response_text\`**: A short, 1-2 sentence bot response.
+-   **\`lead\`**: (Required Boolean) \`true\` for intents aiming to collect user info (contact, pricing, quote, booking). \`false\` for all others.
+-   **\`follow_up_options\`**: An array of 2-4 navigation options. \`option_text\` MUST be very short (1-3 words).
+-   **\`cta_button_text\` & \`cta_button_link\`**: Use ONLY for the main, primary call-to-action link.
+-   **\`NEGATIVE CONSTRAINT\`**: Do NOT merge distinct topics. 'Service Process' and 'Service Cost' must be two separate intents.
+
+---
+**HYPER-GRANULAR EXAMPLE (Follow this model for granularity)**
+---
+
+**Example Input Text:**
+Our Web Development service focuses on modern frameworks and SEO optimization. It's a package starting at $2,000. We offer ongoing support.
+
+**Example Output JSON (demonstrating the required granularity):**
+[
+  {
+    "intent_id": "web_dev_overview",
+    "nlp_training_phrases": ["Tell me about web development", "Web dev service?", "Web development"],
+    "default_response_text": "Our Web Development service creates modern, SEO-optimized websites. What would you like to know more about?",
+    "lead": false,
+    "follow_up_options": [
+      {"option_text": "Pricing", "associated_intent_id": "web_dev_pricing"},
+      {"option_text": "SEO", "associated_intent_id": "web_dev_seo"},
+      {"option_text": "Support", "associated_intent_id": "web_dev_support"}
+    ]
+  },
+  {
+    "intent_id": "web_dev_pricing",
+    "nlp_training_phrases": ["How much is web dev?", "web dev cost?", "price for a website?"],
+    "default_response_text": "Our web development packages start at $2,000. For a detailed quote, it's best to chat with our team.",
+    "lead": true,
+    "cta_button_text": "Chat on WhatsApp for Quote",
+    "cta_button_link": "${whatsappLink}",
+    "follow_up_options": [
+      {"option_text": "Ask something else", "associated_intent_id": "greeting"}
+    ]
+  },
+  {
+    "intent_id": "web_dev_support",
+    "nlp_training_phrases": ["Do you offer support?", "What about maintenance?", "ongoing support"],
+    "default_response_text": "Yes, we offer comprehensive ongoing support and maintenance packages to keep your website running smoothly.",
+    "lead": true,
+    "follow_up_options": [
+      {"option_text": "Talk to an expert", "associated_intent_id": "contact_expert"},
+      {"option_text": "Web Dev Overview", "associated_intent_id": "web_dev_overview"}
+    ]
+  }
+]
+
+---
+**Input Text to Process:**
 ${plainTextContent}
 
 ---
-Output JSON (List of TrainingDataItem objects):
+**Output (Valid JSON Array Only):**
 `;
 
-  // Retry logic for Gemini API 503 errors
-  let result;
+  // Your existing retry logic is solid and remains a best practice.
+  let response;
   let lastError;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -123,58 +162,56 @@ Output JSON (List of TrainingDataItem objects):
         console.warn(`[Training] Gemini API retrying (attempt ${attempt + 1}) after ${delay}ms...`);
         await new Promise(res => setTimeout(res, delay));
       }
-      result = await ai.models.generateContent({
-        // Model remains gemini-1.5-flash as per your provided code, not 2.5 flash.
-        // If you intended to use 'gemini-2.5-flash', you'd change the string below.
-        model: 'gemini-1.5-flash',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          responseMimeType: 'application/json',
-        },
+      
+      const genAI = new GoogleGenAI({ apiKey: String(key) });
+
+      const result = await genAI.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
       });
-      // Check for Gemini API overload error in the response
-      if (result && typeof result.text === 'string' && result.text.includes('model is overloaded')) {
-        throw new Error('Gemini API model is overloaded');
-      }
+
+      response = result;
       break; // Success
     } catch (e: any) {
       lastError = e;
-      if (e && e.message && (e.message.includes('503') || e.message.includes('overloaded') || e.message.includes('UNAVAILABLE'))) {
+      // Check for specific retryable error codes
+      if (e.message?.includes('503') || e.message?.includes('overloaded') || e.message?.includes('UNAVAILABLE')) {
         if (attempt === 2) {
           console.error('[Training] Gemini API overloaded after 3 attempts.');
           throw new Error('The AI model is temporarily overloaded. Please try again in a few moments.');
         }
-        // else, retry
       } else {
-        // Not a retryable error
-        throw e;
+        console.error('[Training] Non-retryable Gemini error:', e);
+        throw e; // Not a retryable error, throw immediately
       }
     }
   }
-  if (!result) {
-    throw lastError || new Error('Failed to get a response from Gemini API');
+
+  if (!response) {
+    throw lastError || new Error('Failed to get a response from Gemini API after multiple retries.');
   }
 
   try {
-    const jsonStr = result.text || '';
-    console.log('[Training] Gemini raw response:', jsonStr.slice(0, 200));
+    const jsonStr = response.text || '';
+    if (!jsonStr) {
+      throw new Error("Received empty text response from API");
+    }
+    console.log('[Training] Gemini raw response received. Length:', jsonStr.length);
     try {
-      const parsed = JSON.parse(jsonStr);
-      console.log('[Training] Gemini response parsed successfully. Intents:', Array.isArray(parsed) ? parsed.map(i => i.intent_id) : typeof parsed);
-      return parsed;
+      return JSON.parse(jsonStr);
     } catch (e) {
-      console.warn('[Training] JSON parse failed, attempting repair...');
-      // Dynamically import jsonrepair only if needed
-      // @ts-ignore
-      const mod = await import('jsonrepair');
-      const repairFn = mod.jsonrepair || mod;
-      const repaired = repairFn(jsonStr);
-      const parsed = JSON.parse(repaired);
-      console.log('[Training] Gemini response repaired and parsed successfully. Intents:', Array.isArray(parsed) ? parsed.map(i => i.intent_id) : typeof parsed);
-      return parsed;
+      console.warn('[Training] JSON parse failed, attempting to repair...');
+      const { jsonrepair } = await import('jsonrepair');
+      const repaired = jsonrepair(jsonStr);
+      console.log('[Training] Gemini response repaired and parsed successfully.');
+      return JSON.parse(repaired);
     }
   } catch (e) {
-    console.error('Failed to parse Gemini\'s JSON response:', result?.text, e);
-    throw new Error('Failed to generate valid structured data.');
+    console.error('Failed to parse Gemini\'s JSON response:', e);
+    // Log the problematic response text if available
+    if (response) {
+       console.error('Raw response text that failed parsing:', response.text || '');
+    }
+    throw new Error('Failed to generate valid structured data from the AI model.');
   }
 }
