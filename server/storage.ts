@@ -207,12 +207,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLead(insertLead: InsertLead): Promise<Lead> {
-    const db = await getDb();
-    const [lead] = await db
-      .insert(leads)
-      .values(insertLead)
-      .returning();
-    return lead;
+    
+
+    try {
+      const db = await getDb();
+      const [lead] = await db
+        .insert(leads)
+        .values(insertLead)
+        .returning();
+
+      
+
+      return lead;
+    } catch (error) {
+      console.error('[Storage] Error creating lead:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        insertLead: {
+          chatbotId: insertLead.chatbotId,
+          userId: insertLead.userId,
+          name: insertLead.name,
+          email: insertLead.email,
+          phone: insertLead.phone
+        },
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }
   }
 
   async getLead(id: number): Promise<Lead | undefined> {

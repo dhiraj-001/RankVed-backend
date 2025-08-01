@@ -547,26 +547,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/leads", async (req, res) => {
+
+
     try {
       const leadData = insertLeadSchema.parse(req.body);
+   
+
       const lead = await storage.createLead(leadData);
+    
       
       // Send webhook if configured
       const chatbot = await storage.getChatbot(leadData.chatbotId);
       if (chatbot?.leadsWebhookUrl) {
+       
+
         try {
-          await fetch(chatbot.leadsWebhookUrl, {
+          const webhookResponse = await fetch(chatbot.leadsWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(lead),
           });
+
+          
+
+          if (!webhookResponse.ok) {
+            console.warn('[Lead Submission] Webhook returned non-OK status:', {
+              webhookUrl: chatbot.leadsWebhookUrl,
+              status: webhookResponse.status,
+              statusText: webhookResponse.statusText,
+              leadId: lead.id
+            });
+          }
         } catch (webhookError) {
-          console.error("Webhook error:", webhookError);
+          console.error('[Lead Submission] Webhook error:', {
+            webhookUrl: chatbot.leadsWebhookUrl,
+            error: webhookError instanceof Error ? webhookError.message : 'Unknown webhook error',
+            stack: webhookError instanceof Error ? webhookError.stack : undefined,
+            leadId: lead.id,
+            chatbotId: lead.chatbotId
+          });
         }
+      } else {
+        console.log('[Lead Submission] No webhook configured for chatbot:', {
+          chatbotId: leadData.chatbotId,
+          hasWebhookUrl: !!chatbot?.leadsWebhookUrl
+        });
       }
       
+      console.log('[Lead Submission] Request completed successfully:', {
+        leadId: lead.id,
+        chatbotId: lead.chatbotId,
+        responseStatus: 200
+      });
+
       res.json(lead);
     } catch (error) {
+      console.error('[Lead Submission] Error processing request:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        body: req.body,
+        timestamp: new Date().toISOString()
+      });
+
       res.status(400).json({ message: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
@@ -681,15 +723,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send webhook if configured
       if (chatbot.leadsWebhookUrl) {
+        console.log('[Lead Collection] Sending webhook:', {
+          webhookUrl: chatbot.leadsWebhookUrl,
+          leadId: lead.id,
+          chatbotId: chatbotId,
+          chatbotName: chatbot.name
+        });
+
         try {
-          await fetch(chatbot.leadsWebhookUrl, {
+          const webhookResponse = await fetch(chatbot.leadsWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(lead),
           });
+
+          console.log('[Lead Collection] Webhook sent successfully:', {
+            webhookUrl: chatbot.leadsWebhookUrl,
+            status: webhookResponse.status,
+            statusText: webhookResponse.statusText,
+            responseHeaders: Object.fromEntries(webhookResponse.headers.entries()),
+            leadId: lead.id,
+            chatbotId: chatbotId
+          });
+
+          if (!webhookResponse.ok) {
+            console.warn('[Lead Collection] Webhook returned non-OK status:', {
+              webhookUrl: chatbot.leadsWebhookUrl,
+              status: webhookResponse.status,
+              statusText: webhookResponse.statusText,
+              leadId: lead.id,
+              chatbotId: chatbotId
+            });
+          }
         } catch (webhookError) {
-          console.error("Webhook error:", webhookError);
+          console.error('[Lead Collection] Webhook error:', {
+            webhookUrl: chatbot.leadsWebhookUrl,
+            error: webhookError instanceof Error ? webhookError.message : 'Unknown webhook error',
+            stack: webhookError instanceof Error ? webhookError.stack : undefined,
+            leadId: lead.id,
+            chatbotId: chatbotId
+          });
         }
+      } else {
+        console.log('[Lead Collection] No webhook configured for chatbot:', {
+          chatbotId: chatbotId,
+          chatbotName: chatbot.name,
+          hasWebhookUrl: !!chatbot.leadsWebhookUrl
+        });
       }
       
       res.json({ 
@@ -724,6 +804,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         status: 'unhealthy', 
         database: 'disconnected',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Simple webhook test endpoint (no database dependency)
+  app.post("/api/test-webhook", async (req, res) => {
+    console.log('[Test Webhook] Request received:', {
+      method: req.method,
+      url: req.url,
+      headers: {
+        origin: req.headers.origin,
+        referer: req.headers.referer,
+        'user-agent': req.headers['user-agent'],
+        'content-type': req.headers['content-type'],
+        'content-length': req.headers['content-length']
+      },
+      body: req.body,
+      bodySize: JSON.stringify(req.body).length,
+      timestamp: new Date().toISOString()
+    });
+
+    try {
+      // Validate the webhook payload
+      const payload = req.body;
+      console.log('[Test Webhook] Processing payload:', {
+        hasPayload: !!payload,
+        payloadType: typeof payload,
+        payloadKeys: payload ? Object.keys(payload) : [],
+        payloadSize: JSON.stringify(payload).length
+      });
+
+      // Simulate webhook processing
+      const processingTime = Math.random() * 1000; // Random processing time
+      await new Promise(resolve => setTimeout(resolve, processingTime));
+
+      console.log('[Test Webhook] Webhook processed successfully:', {
+        processingTimeMs: Math.round(processingTime),
+        responseStatus: 200,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        message: 'Webhook received successfully',
+        timestamp: new Date().toISOString(),
+        processingTimeMs: Math.round(processingTime),
+        receivedData: {
+          method: req.method,
+          headers: Object.keys(req.headers),
+          bodyKeys: payload ? Object.keys(payload) : [],
+          bodySize: JSON.stringify(payload).length
+        }
+      });
+    } catch (error) {
+      console.error('[Test Webhook] Error processing webhook:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
+      });
+
+      res.status(500).json({
+        success: false,
+        message: 'Webhook processing failed',
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString()
       });
