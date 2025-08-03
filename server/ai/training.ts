@@ -80,7 +80,7 @@ You are an expert conversational AI designer. Your SOLE task is to analyze the p
 **CORE DIRECTIVES**
 ---
 
-1.  **MAXIMUM GRANULARITY (PRIMARY OBJECTIVE):** Your main goal is to generate **AT LEAST 40-70 distinct intents**. You MUST break down EVERY single topic, subtopic, concept, feature, benefit, process step, and potential question into its own separate intent. Be surgically precise and exhaustive.
+1.  **MAXIMUM GRANULARITY (PRIMARY OBJECTIVE):** Your main goal is to generate **AT LEAST 50-70 distinct intents**. You MUST break down EVERY single topic, subtopic, concept, feature, benefit, process step, and potential question into its own separate intent. Be surgically precise and exhaustive.
 2.  **DETAILED BREAKDOWN STRATEGY:** For EACH topic found in the text, you MUST generate multiple specific intents covering all angles: Overview, Process, Benefits, Cost, Requirements, FAQs, etc.
 3.  **CUSTOMER-CENTRIC DIRECT CONTACT:** After 2-3 conversational turns, or whenever a user needs specific help, ALWAYS provide a CTA button or follow-up option to connect with a human. Use the specific contact details provided below.
     -   **WhatsApp Link:** ${whatsappLink || 'N/A'}
