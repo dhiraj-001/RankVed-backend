@@ -526,7 +526,7 @@ Here is the chatbot's training data for your reference:
 ${plainTrainingData}
 
 Return only the response text, formatted for clarity and relevance as described above.
-- If the query is not related to the training data context, respond to it naturally as a normal ai assistant.
+- If the query is not related to the training data context, respond to it naturally as a normal ai agent.
 `;
 
       if (aiProvider === 'google' || aiProvider === 'platform') {
