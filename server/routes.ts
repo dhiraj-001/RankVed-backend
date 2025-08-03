@@ -810,6 +810,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Keep-alive endpoint for cron jobs (lightweight, no database check)
+  app.get("/api/keep-alive", async (req, res) => {
+    console.log('[Keep-Alive] Cron job ping received:', new Date().toISOString());
+    res.json({ 
+      status: 'alive', 
+      message: 'Backend is active and responding',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  });
+
   // Simple webhook test endpoint (no database dependency)
   app.post("/api/test-webhook", async (req, res) => {
     console.log('[Test Webhook] Request received:', {
