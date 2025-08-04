@@ -505,7 +505,7 @@ ${conversationContext}
 ${leadCollectionInstruction}${greetingInstruction}
 
 Based on the user's intent "${detectedIntentLabel}", and the message "${message}", generate a response that is:
-- As relevant and concise as possible. Try to round up in 1 to 2 short sentences.
+- As relevant and concise as possible. Try to round up in 1 to 2 **short sentences**.
 - If the answer can be made clearer as a list, use bullet points (use '-' for each point).
 - If there are any important keywords, actions, or values, highlight them using double asterisks (e.g., **important**).
 - Try to avoid answering in paragraphs; use the most direct and clear format for the answer. Always use line breaks to make it more readable.
