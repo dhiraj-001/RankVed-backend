@@ -1681,7 +1681,7 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
         website: chatbotData.website || '',
         
         // Branding
-        poweredByText: chatbotData.poweredByText || 'Powered by RankVed',
+        poweredByText: chatbotData.poweredByText || '',
         poweredByLink: chatbotData.poweredByLink || '#',
         
         // Modern appearance
@@ -1693,7 +1693,6 @@ app.get('/api/chatbots/:chatbotId/popup-sound', authenticateUser, async (req: Au
         // Status
         isActive: chatbotData.isActive
       };
-
       res.json(config);
 
     } catch (error) {

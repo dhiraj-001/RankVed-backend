@@ -60,7 +60,7 @@ export const chatbots = pgTable("chatbots", {
   
   // Flow & Branding
   businessType: text("business_type").default("general"),
-  poweredByText: text("powered_by_text").default("Powered by ChatBot Pro"),
+  poweredByText: text("powered_by_text").default(""),
   poweredByLink: text("powered_by_link").default("#"),
   
   // Placement
